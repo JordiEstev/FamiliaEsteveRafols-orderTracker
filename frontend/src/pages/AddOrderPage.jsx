@@ -9,7 +9,7 @@ export default function AddOrderPage() {
   const [form, setForm] = useState({
     customer: "",
     date: "",
-    place: "Cantallops", // or Store 1 etc.
+    place: "Cantallops", 
     notes: ""
   });
 
@@ -34,10 +34,37 @@ export default function AddOrderPage() {
       alert("Afegiu almenys una fruita.");
       return;
     }
-    const payload = { ...form, fruits };
-    console.log("Submit payload:", payload);
-    // TODO: POST to backend
-    navigate("/");
+    const payload = {
+      customer: form.customer,
+      date: form.date,
+      place: form.place,
+      notes: form.notes,
+      fruits: fruits.map(f => ({
+        fruit: f.fruit,          
+        size: f.size ?? null,
+        qty: f.qty,
+        weight: f.weight ?? null 
+      }))
+    };
+
+  fetch("http://localhost:8000/orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+    .then(res => {
+      if (!res.ok) throw new Error("Failed to save order");
+      return res.json();
+    })
+    .then(() => {
+      navigate("/");  // Only navigate if success
+    })
+    .catch(err => {
+      console.error("Error saving order:", err);
+      alert("Hi ha hagut un error en guardar la comanda.");
+    });
+
+
   };
 
   return (
@@ -82,10 +109,10 @@ export default function AddOrderPage() {
             onChange={handleBasicChange}
             className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500"
           >
+            <option>Sant Pau</option>
             <option>Cantallops</option>
-            <option>Magatzem</option>
-            <option>Botiga Centre</option>
-            <option>Botiga Nord</option>
+            <option>Vilafranca</option>
+            <option>La Girada</option>
           </select>
         </div>
 
@@ -147,6 +174,12 @@ export default function AddOrderPage() {
           </ul>
         </div>
 
+        <FruitSelectorModal
+          open={openFruitModal}
+          onClose={() => setOpenFruitModal(false)}
+          onAdd={addFruit}
+        />
+
         <div className="pt-4 flex gap-3">
           <button
             type="submit"
@@ -164,40 +197,39 @@ export default function AddOrderPage() {
         </div>
       </form>
 
-      <FruitSelectorModal
-        open={openFruitModal}
-        onClose={() => setOpenFruitModal(false)}
-        onAdd={addFruit}
-      />
     </div>
   );
 }
 
 function renderFruitLabel(item) {
-  if (item.fruit === "pressec") {
-    return `Pressec ${item.variant}`;
+  if (item.fruit.startsWith("pressec_")) {
+    const variant = item.fruit.split("_")[1]; // groc / vermell
+    return `Pressec ${variant}`;
   }
-  if (["albercoc","cirera","melo","sindria"].includes(item.fruit)) {
-    const map = {
-      albercoc: "Albercoc",
-      cirera: "Cirera",
-      melo: "Meló",
-      sindria: "Síndria"
-    };
-    return map[item.fruit];
-  }
-  return item.fruit;
+  const map = {
+    albercoc: "Albercoc",
+    cirera: "Cirera",
+    melo: "Meló",
+    sindria: "Síndria"
+  };
+  return map[item.fruit] || item.fruit;
 }
 
 function renderFruitDetails(item) {
-  if (item.fruit === "pressec") {
+  if (item.fruit.startsWith("pressec_")) {
     return `${item.qty} caixes · calibre ${item.size}`;
   }
-  if (["albercoc","cirera"].includes(item.fruit)) {
-    return `${item.qty} × ${item.weightPerUnit} kg (${item.qty * item.weightPerUnit} kg total)`;
+  if (item.fruit === "albercoc" || item.fruit === "cirera") {
+    // weight = per-unit (1 or 2)
+    const total = item.weight * item.qty;
+    return `${item.qty} × ${item.weight} kg = ${total} kg`;
   }
-  if (["melo","sindria"].includes(item.fruit)) {
-    return `${item.qty} peces${item.avgWeight ? ` · ${item.avgWeight} kg/peça (~${(item.avgWeight*item.qty).toFixed(1)} kg)` : ""}`;
+  if (item.fruit === "melo" || item.fruit === "sindria") {
+    // weight = total (optional)
+    if (item.weight) {
+      return `${item.qty} peces · total ${item.weight} kg`;
+    }
+    return `${item.qty} peces`;
   }
   return "";
 }

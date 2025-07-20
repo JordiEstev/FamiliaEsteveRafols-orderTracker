@@ -2,15 +2,15 @@ import { useState } from "react";
 import { v4 as uuid } from "uuid";
 
 const FRUIT_TYPES = [
-  { key: "pressec-groc", label: "Pressec Groc", cat: "pressec", variant: "groc" },
-  { key: "pressec-vermell", label: "Pressec Vermell", cat: "pressec", variant: "vermell" },
+  { key: "pressec_groc", label: "Pressec Groc", group: "pressec" },
+  { key: "pressec_vermell", label: "Pressec Vermell", group: "pressec" },
   { key: "albercoc", label: "Albercoc" },
   { key: "cirera", label: "Cirera" },
   { key: "melo", label: "Meló" },
   { key: "sindria", label: "Síndria" }
 ];
 
-const PEACH_SIZES = [16,18,20,22,24,26];
+const PEACH_SIZES = [16, 18, 20, 22, 24, 26];
 
 export default function FruitSelectorModal({ open, onClose, onAdd }) {
   const [step, setStep] = useState("grid"); // grid | form
@@ -27,14 +27,13 @@ export default function FruitSelectorModal({ open, onClose, onAdd }) {
 
   const handleFruitClick = (f) => {
     setSelection(f);
-    // initialize form depending on type
-    if (f.cat === "pressec") {
+    if (f.group === "pressec") {
       setForm({ size: 22, qty: 1 });
-    } else if (["albercoc","cirera"].includes(f.key)) {
-      setForm({ weightPerUnit: 1, qty: 1 });
+    } else if (["albercoc", "cirera"].includes(f.key)) {
+      setForm({ weight: 1, qty: 1 });     // weight = per-unit (1 or 2)
     } else {
       // melo / sindria
-      setForm({ qty: 1, avgWeight: "" });
+      setForm({ qty: 1, weight: "" });    // weight = total optional
     }
     setStep("form");
   };
@@ -44,36 +43,39 @@ export default function FruitSelectorModal({ open, onClose, onAdd }) {
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const inc = (field) => setForm(prev => ({ ...prev, [field]: Number(prev[field]||0)+1 }));
-  const dec = (field) => setForm(prev => ({ ...prev, [field]: Math.max(1, Number(prev[field]||1)-1) }));
+  const setQty = (v) =>
+    setForm(prev => ({ ...prev, qty: Math.max(1, Number(v) || 1) }));
+
+  const inc = () => setQty((form.qty || 1) + 1);
+  const dec = () => setQty((form.qty || 1) - 1);
 
   const handleAdd = () => {
     if (!selection) return;
     let item;
-    if (selection.cat === "pressec") {
+    if (selection.group === "pressec") {
       item = {
         id: uuid(),
-        fruit: "pressec",
-        variant: selection.variant,
+        fruit: selection.key,        // pressec_groc / pressec_vermell
         size: Number(form.size),
         qty: Number(form.qty),
-        unit: "caixa"
+        weight: null
       };
-    } else if (["albercoc","cirera"].includes(selection.key)) {
+    } else if (["albercoc", "cirera"].includes(selection.key)) {
       item = {
         id: uuid(),
         fruit: selection.key,
-        weightPerUnit: Number(form.weightPerUnit),
         qty: Number(form.qty),
-        unit: "kg"
+        weight: Number(form.weight)   // 1 or 2
       };
     } else {
+      // melo / sindria
       item = {
         id: uuid(),
         fruit: selection.key,
         qty: Number(form.qty),
-        avgWeight: form.avgWeight ? Number(form.avgWeight) : undefined,
-        unit: "peça"
+        weight: form.weight !== "" && form.weight !== null
+          ? Number(form.weight)
+          : null // optional
       };
     }
     onAdd(item);
@@ -86,7 +88,7 @@ export default function FruitSelectorModal({ open, onClose, onAdd }) {
       <div className="w-full max-w-md rounded-xl bg-gray-900 border border-gray-700 p-5 shadow-xl">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-gray-100">
-            {step === "grid" ? "Selecciona fruita" : "Configura"}
+            {step === "grid" ? "Selecciona fruita" : selection?.label}
           </h3>
           <button
             onClick={() => { reset(); onClose(); }}
@@ -111,15 +113,12 @@ export default function FruitSelectorModal({ open, onClose, onAdd }) {
         )}
 
         {step === "form" && selection && (
-          <div className="space-y-4">
-            <div className="text-gray-200 font-medium">
-              {selection.label}
-            </div>
+          <div className="space-y-5">
 
-            {selection.cat === "pressec" && (
+            {selection.group === "pressec" && (
               <>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Mida (calibre)</label>
+                  <label className="block text-xs text-gray-400 mb-1">Calibre</label>
                   <select
                     name="size"
                     value={form.size}
@@ -129,27 +128,24 @@ export default function FruitSelectorModal({ open, onClose, onAdd }) {
                     {PEACH_SIZES.map(s => <option key={s}>{s}</option>)}
                   </select>
                 </div>
-                <NumberStepper
-                  label="Caixes"
-                  value={form.qty}
-                  setValue={v => setForm(prev => ({ ...prev, qty: v }))}
-                />
+                <QtyStepper qty={form.qty} setQty={setQty} label="Caixes" />
               </>
             )}
 
-            {["albercoc","cirera"].includes(selection.key) && (
+            {["albercoc", "cirera"].includes(selection.key) && (
               <>
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">Pes per unitat</label>
                   <div className="flex gap-2">
-                    {[1,2].map(w => (
+                    {[1, 2].map(w => (
                       <button
                         key={w}
-                        onClick={() => setForm(prev => ({ ...prev, weightPerUnit: w }))}
+                        type="button"
+                        onClick={() => setForm(prev => ({ ...prev, weight: w }))}
                         className={`flex-1 rounded-md border px-3 py-2 text-sm ${
-                          form.weightPerUnit === w
+                          form.weight === w
                             ? "bg-violet-600 border-violet-500 text-white"
-                            : "bg-gray-800 border-gray-600 text-gray-200 hover:bg-gray-700"
+                            : "bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700"
                         }`}
                       >
                         {w} kg
@@ -157,33 +153,25 @@ export default function FruitSelectorModal({ open, onClose, onAdd }) {
                     ))}
                   </div>
                 </div>
-                <NumberStepper
-                  label="Quantitat (unitats d'aquest pes)"
-                  value={form.qty}
-                  setValue={v => setForm(prev => ({ ...prev, qty: v }))}
-                />
+                <QtyStepper qty={form.qty} setQty={setQty} label="Unitats" />
               </>
             )}
 
-            {["melo","sindria"].includes(selection.key) && (
+            {["melo", "sindria"].includes(selection.key) && (
               <>
-                <NumberStepper
-                  label="Nombre de peces"
-                  value={form.qty}
-                  setValue={v => setForm(prev => ({ ...prev, qty: v }))}
-                />
+                <QtyStepper qty={form.qty} setQty={setQty} label="Peces" />
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">
-                    Pes mitjà per peça (opcional, kg)
+                    Pes total (kg, opcional)
                   </label>
                   <input
+                    name="weight"
                     type="number"
                     step="0.1"
-                    name="avgWeight"
-                    value={form.avgWeight}
+                    value={form.weight}
                     onChange={handleChange}
+                    placeholder="Ex: 13.5"
                     className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                    placeholder="p. ex. 3.2"
                   />
                 </div>
               </>
@@ -191,12 +179,14 @@ export default function FruitSelectorModal({ open, onClose, onAdd }) {
 
             <div className="flex gap-2 pt-2">
               <button
+                type="button"
                 onClick={handleAdd}
                 className="flex-1 rounded-md bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500"
               >
                 Afegir
               </button>
               <button
+                type="button"
                 onClick={() => setStep("grid")}
                 className="flex-1 rounded-md bg-gray-700 px-4 py-2 text-sm font-medium text-gray-200 hover:bg-gray-600"
               >
@@ -210,29 +200,26 @@ export default function FruitSelectorModal({ open, onClose, onAdd }) {
   );
 }
 
-/* Helper component for quantity */
-function NumberStepper({ label, value, setValue }) {
-  const inc = () => setValue(Number(value || 0) + 1);
-  const dec = () => setValue(Math.max(1, Number(value || 1) - 1));
+function QtyStepper({ qty, setQty, label }) {
   return (
     <div>
       <label className="block text-xs text-gray-400 mb-1">{label}</label>
-      <div className="flex items-stretch rounded-md overflow-hidden border border-gray-600">
+      <div className="flex items-stretch overflow-hidden rounded-md border border-gray-600">
         <button
           type="button"
-          onClick={dec}
+          onClick={() => setQty(qty > 1 ? qty - 1 : 1)}
           className="bg-gray-800 px-3 text-lg text-gray-200 hover:bg-gray-700"
         >−</button>
         <input
           type="number"
-            className="w-full bg-gray-900 text-center text-gray-100 text-sm focus:outline-none"
-          value={value}
-          onChange={e => setValue(Number(e.target.value))}
           min={1}
+          value={qty}
+          onChange={(e) => setQty(Number(e.target.value) || 1)}
+          className="w-full bg-gray-900 text-center text-gray-100 text-sm focus:outline-none"
         />
         <button
           type="button"
-          onClick={inc}
+          onClick={() => setQty(qty + 1)}
           className="bg-gray-800 px-3 text-lg text-gray-200 hover:bg-gray-700"
         >+</button>
       </div>
