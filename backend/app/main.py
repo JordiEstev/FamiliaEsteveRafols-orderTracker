@@ -2,12 +2,13 @@ from datetime import datetime
 from typing import List, Optional, Literal
 from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, validator, Field
+from pydantic import BaseModel, validator, Field, ConfigDict
 from sqlalchemy import (
     create_engine, Column, Integer, String, Float, ForeignKey,
     Text, DateTime
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker, Session
+from sqlalchemy.orm import joinedload
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -41,9 +42,33 @@ class OrderItemORM(Base):
 
 Base.metadata.create_all(bind=engine)
 
+
+# ---- Pydantic Response Models ----
+
+class OrderItem(BaseModel):
+    fruit: str
+    size: Optional[int] = None
+    qty: int
+    weight: Optional[float] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class Order(BaseModel):
+    id: int
+    customer: str
+    date: str
+    place: str
+    notes: Optional[str] = None
+    fruits: List[OrderItem]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ---------- Pydantic Schemas ----------
 
-FruitCode = Literal["pressec_groc", "pressec_vermell", "albercoc", "cirera", "melo", "sindria"]
+FruitCode = Literal["pressec_groc", "pressec_vermell", "pressec_barrejat", "albercoc", "cirera", "melo", "sindria"]
 PlaceName = Literal["Cantallops", "Magatzem", "Botiga Centre", "Botiga Nord"]
 
 class FruitItemIn(BaseModel):
@@ -79,8 +104,8 @@ class FruitItemIn(BaseModel):
 
 class FruitItemOut(FruitItemIn):
     id: int
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class OrderCreate(BaseModel):
     customer: str
@@ -116,7 +141,7 @@ app = FastAPI(title="Fruit Order Tracker (Simplified)")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173"],
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=True,
@@ -131,55 +156,41 @@ def get_db():
 
 # ---------- Routes ----------
 
+
 @app.post("/orders", response_model=OrderOut)
 def create_order(order: OrderCreate, db: Session = Depends(get_db)):
-    orm_order = OrderORM(
+    new_order = OrderORM(
         customer=order.customer,
         date=order.date,
         place=order.place,
         notes=order.notes,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        items=[
+            OrderItemORM(
+                fruit=item.fruit,
+                size=item.size,
+                qty=item.qty,
+                weight=item.weight
+            )
+            for item in order.fruits
+        ]
     )
-    db.add(orm_order)
-    db.flush()
 
-    for fi in order.fruits:
-        item = OrderItemORM(
-            order_id=orm_order.id,
-            fruit=fi.fruit,
-            size=fi.size,
-            qty=fi.qty,
-            weight=fi.weight
-        )
-        db.add(item)
-
+    db.add(new_order)
     db.commit()
-    db.refresh(orm_order)
-    return orm_order
+    db.refresh(new_order)
 
-@app.get("/orders", response_model=List[OrderOut])
-def list_orders(
-    db: Session = Depends(get_db),
-    date: Optional[str] = Query(None),
-    place: Optional[str] = Query(None),
-    fruit: Optional[str] = Query(None)
-):
-    q = db.query(OrderORM)
-    if date:
-        q = q.filter(OrderORM.date == date)
-    if place:
-        q = q.filter(OrderORM.place == place)
-    orders = q.order_by(OrderORM.created_at.desc()).all()
+    return {
+        "id": new_order.id,
+        "customer": new_order.customer,
+        "date": new_order.date,
+        "place": new_order.place,
+        "notes": new_order.notes,
+        "created_at": new_order.created_at,
+        "updated_at": new_order.updated_at,
+        "fruits": new_order.items  
+    }
 
-    if fruit:
-        filtered = []
-        for o in orders:
-            o.items = [it for it in o.items if it.fruit == fruit]
-            if o.items:
-                filtered.append(o)
-        orders = filtered
-    return orders
+
 
 @app.delete("/orders/{order_id}", status_code=204)
 def delete_order(order_id: int, db: Session = Depends(get_db)):
@@ -189,3 +200,62 @@ def delete_order(order_id: int, db: Session = Depends(get_db)):
     db.delete(order)
     db.commit()
     return None
+
+@app.get("/orders", response_model=List[OrderOut])
+def get_orders(db: Session = Depends(get_db)):
+    orders = db.query(OrderORM).options(joinedload(OrderORM.items)).all()
+    return [
+        {
+            "id": o.id,
+            "customer": o.customer,
+            "date": o.date,
+            "place": o.place,
+            "notes": o.notes,
+            "created_at": o.created_at,
+            "updated_at": o.updated_at,
+            "fruits": o.items
+        }
+        for o in orders
+    ]
+
+@app.put("/orders/{order_id}", response_model=OrderOut)
+def update_order(order_id: int, order: OrderCreate, db: Session = Depends(get_db)):
+    db_order = db.query(OrderORM).filter(OrderORM.id == order_id).first()
+    if not db_order:
+        raise HTTPException(404, "Order not found")
+
+    # Update fields
+    db_order.customer = order.customer
+    db_order.date = order.date
+    db_order.place = order.place
+    db_order.notes = order.notes
+    db_order.updated_at = datetime.utcnow()
+
+    # Clear existing items
+    db.query(OrderItemORM).filter(OrderItemORM.order_id == order_id).delete()
+
+    # Add new items
+    new_items = [
+        OrderItemORM(
+            order_id=order_id,
+            fruit=item.fruit,
+            size=item.size,
+            qty=item.qty,
+            weight=item.weight
+        )
+        for item in order.fruits
+    ]
+    db.add_all(new_items)
+    db.commit()
+    db.refresh(db_order)
+
+    return {
+        "id": db_order.id,
+        "customer": db_order.customer,
+        "date": db_order.date,
+        "place": db_order.place,
+        "notes": db_order.notes,
+        "created_at": db_order.created_at,
+        "updated_at": db_order.updated_at,
+        "fruits": db_order.items
+    }

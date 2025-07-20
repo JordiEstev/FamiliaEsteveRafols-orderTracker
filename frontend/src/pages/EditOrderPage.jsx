@@ -1,31 +1,46 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import FruitSelectorModal from "../components/FruitSelectorModal";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import FruitSelectorModal from "../components/FruitSelectorModal"; // adjust if path differs
 
-export default function AddOrderPage() {
+export default function EditOrderPage() {
   const navigate = useNavigate();
-  const [openFruitModal, setOpenFruitModal] = useState(false);
-
+  const { id } = useParams();
   const [form, setForm] = useState({
     customer: "",
     date: "",
-    place: "Cantallops", 
+    place: "Cantallops",
     notes: ""
   });
-
   const [fruits, setFruits] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [openFruitModal, setOpenFruitModal] = useState(false);
+
+  // Fetch order by ID
+  useEffect(() => {
+    fetch(`http://localhost:8000/orders`)
+      .then(res => res.json())
+      .then(data => {
+        const order = data.find(o => o.id === parseInt(id));
+        if (!order) throw new Error("Not found");
+        setForm({
+          customer: order.customer,
+          date: order.date,
+          place: order.place,
+          notes: order.notes || ""
+        });
+        setFruits(order.fruits);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Error loading order:", err);
+        alert("No s'ha pogut carregar la comanda.");
+        navigate("/");
+      });
+  }, [id]);
 
   const handleBasicChange = (e) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
-  };
-
-  const addFruit = (item) => {
-    setFruits(prev => [...prev, item]);
-  };
-
-  const removeFruit = (id) => {
-    setFruits(prev => prev.filter(f => f.id !== id));
   };
 
   const handleSubmit = (e) => {
@@ -35,38 +50,37 @@ export default function AddOrderPage() {
       return;
     }
     const payload = {
-      customer: form.customer,
-      date: form.date,
-      place: form.place,
-      notes: form.notes,
+      ...form,
       fruits: fruits.map(f => ({
-        fruit: f.fruit,          
-        size: f.size ?? null,
+        fruit: f.fruit,
         qty: f.qty,
-        weight: f.weight ?? null 
+        size: f.size ?? null,
+        weight: f.weight ?? null
       }))
     };
-    console.log("Submitting order:", payload);
 
-  fetch("http://localhost:8000/orders", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  })
-    .then(res => {
-      if (!res.ok) throw new Error("Failed to save order");
-      return res.json();
+    fetch(`http://localhost:8000/orders/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
     })
-    .then(() => {
-      navigate("/");  // Only navigate if success
-    })
-    .catch(err => {
-      console.error("Error saving order:", err);
-      alert("Hi ha hagut un error en guardar la comanda.");
-    });
-
-
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to update");
+        return res.json();
+      })
+      .then(() => {
+        navigate("/");
+      })
+      .catch(err => {
+        console.error("Error updating:", err);
+        alert("Error en actualitzar la comanda.");
+      });
   };
+
+  const addFruit = (item) => setFruits(prev => [...prev, item]);
+  const removeFruit = (fid) => setFruits(prev => prev.filter(f => f.id !== fid));
+
+  if (loading) return <div className="p-5 text-white">Carregant comanda...</div>;
 
   return (
     <div className="bg-gray-950 min-h-screen text-gray-100 p-5 font-sans">
@@ -75,17 +89,16 @@ export default function AddOrderPage() {
         className="max-w-md mx-auto bg-gray-900 border border-gray-800 rounded-xl shadow p-5 space-y-5"
       >
         <h1 className="text-2xl font-bold flex items-center gap-2">
-          <span className="text-violet-500 text-3xl">+</span> Nova Comanda
+          ✏️ Editar Comanda
         </h1>
 
         <div className="space-y-1">
           <label className="text-xs uppercase tracking-wide text-gray-400">Client</label>
           <input
             name="customer"
-            placeholder="Nom del client"
             value={form.customer}
             onChange={handleBasicChange}
-            className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500"
+            className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm"
             required
           />
         </div>
@@ -97,18 +110,18 @@ export default function AddOrderPage() {
             name="date"
             value={form.date}
             onChange={handleBasicChange}
-            className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500"
+            className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm"
             required
           />
         </div>
 
         <div className="space-y-1">
           <label className="text-xs uppercase tracking-wide text-gray-400">Lloc</label>
-            <select
+          <select
             name="place"
             value={form.place}
             onChange={handleBasicChange}
-            className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500"
+            className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm"
           >
             <option>Sant Pau</option>
             <option>Cantallops</option>
@@ -121,11 +134,10 @@ export default function AddOrderPage() {
           <label className="text-xs uppercase tracking-wide text-gray-400">Notes</label>
           <textarea
             name="notes"
-            placeholder="Observacions..."
             value={form.notes}
             onChange={handleBasicChange}
             rows={2}
-            className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500"
+            className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm"
           />
         </div>
 
@@ -144,24 +156,18 @@ export default function AddOrderPage() {
           </div>
 
           {fruits.length === 0 && (
-            <div className="text-sm text-gray-500 italic">
-              Encara no hi ha fruita afegida.
-            </div>
+            <div className="text-sm text-gray-500 italic">Cap fruita afegida.</div>
           )}
 
           <ul className="space-y-2">
             {fruits.map(item => (
               <li
-                key={item.id}
+                key={item.id || `${item.fruit}-${item.size}-${item.qty}`}
                 className="flex items-start justify-between rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm"
               >
                 <div className="pr-2">
-                  <div className="font-medium">
-                    {renderFruitLabel(item)}
-                  </div>
-                  <div className="text-gray-400 text-xs">
-                    {renderFruitDetails(item)}
-                  </div>
+                  <div className="font-medium">{renderFruitLabel(item)}</div>
+                  <div className="text-gray-400 text-xs">{renderFruitDetails(item)}</div>
                 </div>
                 <button
                   type="button"
@@ -186,7 +192,7 @@ export default function AddOrderPage() {
             type="submit"
             className="flex-1 rounded-md bg-violet-600 py-2 font-semibold hover:bg-violet-500"
           >
-            Guardar
+            Actualitzar
           </button>
           <button
             type="button"
@@ -197,16 +203,19 @@ export default function AddOrderPage() {
           </button>
         </div>
       </form>
-
     </div>
   );
 }
 
 function renderFruitLabel(item) {
-  if (item.fruit.startsWith("pressec_")) {
-    const variant = item.fruit.split("_")[1]; // groc / vermell
+  if (item.fruit === "pressec_barrejat") {
+  return "Pressec barrejat";
+    }
+    if (item.fruit.startsWith("pressec_")) {
+    const variant = item.fruit.split("_")[1];
     return `Pressec ${variant}`;
-  }
+    }
+
   const map = {
     albercoc: "Albercoc",
     cirera: "Cirera",
@@ -221,16 +230,11 @@ function renderFruitDetails(item) {
     return `${item.qty} caixes · calibre ${item.size}`;
   }
   if (item.fruit === "albercoc" || item.fruit === "cirera") {
-    // weight = per-unit (1 or 2)
-    const total = item.weight * item.qty;
+    const total = item.qty * item.weight;
     return `${item.qty} × ${item.weight} kg = ${total} kg`;
   }
   if (item.fruit === "melo" || item.fruit === "sindria") {
-    // weight = total (optional)
-    if (item.weight) {
-      return `${item.qty} peces · total ${item.weight} kg`;
-    }
-    return `${item.qty} peces`;
+    return `${item.qty} peces${item.weight ? ` · ${item.weight} kg` : ''}`;
   }
   return "";
 }

@@ -3,6 +3,7 @@ import { v4 as uuid } from "uuid";
 
 const FRUIT_TYPES = [
   { key: "pressec_groc", label: "Pressec Groc", group: "pressec" },
+  { key: "pressec_barrejat", label: "Pressec Barrejat", group: "pressec" },
   { key: "pressec_vermell", label: "Pressec Vermell", group: "pressec" },
   { key: "albercoc", label: "Albercoc" },
   { key: "cirera", label: "Cirera" },
