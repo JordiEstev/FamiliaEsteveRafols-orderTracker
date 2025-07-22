@@ -69,7 +69,7 @@ class Order(BaseModel):
 # ---------- Pydantic Schemas ----------
 
 FruitCode = Literal["pressec_groc", "pressec_vermell", "pressec_barrejat", "albercoc", "cirera", "melo", "sindria"]
-PlaceName = Literal["Cantallops", "Magatzem", "Botiga Centre", "Botiga Nord"]
+PlaceName = Literal["Cantallops", "Sant Pau", "Vilafranca", "La Girada"]
 
 class FruitItemIn(BaseModel):
     fruit: FruitCode
@@ -81,8 +81,8 @@ class FruitItemIn(BaseModel):
     def validate_size(cls, v, values):
         fruit = values.get("fruit")
         if fruit and fruit.startswith("pressec"):
-            if v not in {16, 18, 20, 22, 24, 26}:
-                raise ValueError("Pressec size must be one of 16,18,20,22,24,26")
+            if v not in {15, 16, 18, 20, 22, 24, 26}:
+                raise ValueError("Pressec size must be one of 15, 16,18,20,22,24,26")
         else:
             if v is not None:
                 raise ValueError("Size only allowed for pressec")

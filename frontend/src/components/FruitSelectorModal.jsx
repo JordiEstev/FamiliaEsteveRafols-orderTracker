@@ -11,7 +11,7 @@ const FRUIT_TYPES = [
   { key: "sindria", label: "Síndria" }
 ];
 
-const PEACH_SIZES = [16, 18, 20, 22, 24, 26];
+const PEACH_SIZES = [15, 16, 18, 20, 22, 24, 26];
 
 export default function FruitSelectorModal({ open, onClose, onAdd }) {
   const [step, setStep] = useState("grid"); // grid | form
@@ -29,7 +29,7 @@ export default function FruitSelectorModal({ open, onClose, onAdd }) {
   const handleFruitClick = (f) => {
     setSelection(f);
     if (f.group === "pressec") {
-      setForm({ size: 22, qty: 1 });
+      setForm({ size: "15", qty: 1 });
     } else if (["albercoc", "cirera"].includes(f.key)) {
       setForm({ weight: 1, qty: 1 });     // weight = per-unit (1 or 2)
     } else {

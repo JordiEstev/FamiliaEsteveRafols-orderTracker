@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Plus, Package, Pencil, Trash2 } from "lucide-react";
+import * as XLSX from 'xlsx';
+
+
 
 function OrderListPage() {
   const navigate = useNavigate();
@@ -9,6 +13,47 @@ function OrderListPage() {
   const [filterPlace, setFilterPlace] = useState("Tots els llocs");
   const [showSummary, setShowSummary] = useState(false);
 
+  function handleExport() {
+  const rows = [];
+
+  // Add Pressecs
+  Object.entries(fruitSummary.pressecs).forEach(([key, qty]) => {
+    const [type, size] = key.split("-");
+    rows.push({
+      Fruit: `Pressec ${type}`,
+      Calibre: size,
+      Quantitat: `${qty} caixes`
+    });
+  });
+
+  // Albercoc and Cirera
+  ["albercoc", "cirera"].forEach(fruit => {
+    Object.entries(fruitSummary[fruit]).forEach(([weight, count]) => {
+      if (count > 0) {
+        rows.push({
+          Fruit: capitalize(fruit),
+          Pes: `${weight}kg`,
+          Quantitat: `${count} comandes`
+        });
+      }
+    });
+  });
+
+  // Melo & Sindria
+  if (fruitSummary.melo > 0) {
+    rows.push({ Fruit: "Meló", Quantitat: `${fruitSummary.melo} peces` });
+  }
+  if (fruitSummary.sindria > 0) {
+    rows.push({ Fruit: "Síndria", Quantitat: `${fruitSummary.sindria} peces` });
+  }
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Resum");
+
+  XLSX.writeFile(workbook, "resum_fruita.xlsx");
+}
+  
 
 
   useEffect(() => {
@@ -35,6 +80,7 @@ function OrderListPage() {
         console.error("Delete error:", err);
         alert("No s'ha pogut eliminar la comanda.");
       });
+    
   };
 
   const filteredOrders = orders.filter(order => {
@@ -87,7 +133,9 @@ function OrderListPage() {
         onClick={() => navigate('/add')}
         className="w-full bg-black text-white py-2 rounded-lg mb-4"
       >
-        + Afegir Comanda
+        <Plus className="inline-block w-4 h-4 mr-1" />
+Afegir Comanda
+
       </button>
 
       {/* Filters */}
@@ -115,13 +163,22 @@ function OrderListPage() {
         onClick={() => setShowSummary(true)}
         className="bg-blue-500 text-white px-3 py-1 rounded mb-4"
       >
-        📦 Veure resum de fruita
+        <Package className="inline-block w-4 h-4 mr-1" />
+Veure resum
+
       </button>
+      <button
+  onClick={handleExport}
+  className="bg-green-500 text-white px-3 py-1 rounded mb-4 ml-2"
+>
+  ⬇️ Exportar Excel
+</button>
+
 
       {showSummary && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-md p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-lg">
-            <h2 className="text-xl font-semibold mb-4">📦 Resum de Fruita</h2>
+            <h2 className="text-xl font-semibold mb-4">📦 Resum</h2>
 
             {/* Pressecs */}
             {Object.keys(fruitSummary.pressecs).length > 0 && (
@@ -190,20 +247,23 @@ function OrderListPage() {
             <span className="text-sm text-gray-500">
               {formatDate(order.date)} · {order.place}
             </span>
-            <div className="mt-2 flex gap-2">
-              <button
-                onClick={() => navigate(`/edit/${order.id}`)}
-                className="bg-yellow-400 px-2 py-1 rounded text-sm"
-              >
-                ✏️ Editar
-              </button>
-              <button
-                onClick={() => handleDelete(order.id)}
-                className="bg-red-500 text-white px-2 py-1 rounded text-sm"
-              >
-                ❌ Eliminar
-              </button>
-            </div>
+<div className="mt-2 flex gap-2">
+  <button
+    onClick={() => navigate(`/edit/${order.id}`)}
+    className="bg-white text-black border border-black px-3 py-1 rounded-lg text-sm flex items-center gap-1"
+  >
+    <Pencil className="w-4 h-4" />
+    Editar
+  </button>
+  <button
+    onClick={() => handleDelete(order.id)}
+    className="bg-white text-black border border-black px-3 py-1 rounded-lg text-sm flex items-center gap-1"
+  >
+    <Trash2 className="w-4 h-4" />
+    Eliminar
+  </button>
+</div>
+
           </div>
         ))
       )}
