@@ -57,7 +57,7 @@ function OrderListPage() {
 
 
   useEffect(() => {
-    fetch("http://localhost:8000/orders")
+    fetch(`${import.meta.env.VITE_API_URL}/orders`)
       .then(res => res.json())
       .then(data => setOrders(data))
       .catch(err => {
@@ -69,7 +69,7 @@ function OrderListPage() {
   const handleDelete = (orderId) => {
     if (!window.confirm("Segur que vols esborrar aquesta comanda?")) return;
 
-    fetch(`http://localhost:8000/orders/${orderId}`, {
+    fetch(`${import.meta.env.VITE_API_URL}/orders/${orderId}`, {
       method: "DELETE"
     })
       .then(res => {

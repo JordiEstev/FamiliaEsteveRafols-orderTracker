@@ -17,7 +17,7 @@ export default function EditOrderPage() {
 
   // Fetch order by ID
   useEffect(() => {
-    fetch(`http://localhost:8000/orders`)
+    fetch(`${import.meta.env.VITE_API_URL}/orders`)
       .then(res => res.json())
       .then(data => {
         const order = data.find(o => o.id === parseInt(id));
@@ -59,7 +59,7 @@ export default function EditOrderPage() {
       }))
     };
 
-    fetch(`http://localhost:8000/orders/${id}`, {
+    fetch(`${import.meta.env.VITE_API_URL}/orders/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
