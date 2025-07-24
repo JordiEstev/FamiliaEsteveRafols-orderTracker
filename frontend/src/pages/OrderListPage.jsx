@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Package, Pencil, Trash2 } from "lucide-react";
+import { Plus, Package, Pencil, Trash2, Sheet } from "lucide-react";
 import * as XLSX from 'xlsx';
 
 
@@ -13,46 +13,96 @@ function OrderListPage() {
   const [filterPlace, setFilterPlace] = useState("Tots els llocs");
   const [showSummary, setShowSummary] = useState(false);
 
-  function handleExport() {
+function handleExport() {
   const rows = [];
 
-  // Add Pressecs
-  Object.entries(fruitSummary.pressecs).forEach(([key, qty]) => {
+  // 1. Per-customer breakdown
+  const customerOrders = {};
+
+  for (const order of filteredOrders) {
+    const customer = order.customer;
+    if (!customerOrders[customer]) customerOrders[customer] = [];
+
+    for (const item of order.fruits) {
+      let description = "";
+
+      if (item.fruit.startsWith("pressec_")) {
+        const type = item.fruit.split("_")[1]; // groc, vermell, barrejat
+        description = `Pressec ${type} ${item.qty} ${item.qty > 1 ? 'caixes' : 'caixa'} ${item.size}`;
+      } else if (item.fruit === "albercoc" || item.fruit === "cirera") {
+        description = `${capitalize(item.fruit)} ${item.qty} × ${item.weight}kg`;
+      } else if (item.fruit === "melo" || item.fruit === "sindria") {
+        description = `${capitalize(item.fruit)} ${item.qty} peces`;
+      } else {
+        description = `${capitalize(item.fruit)}: ${item.qty}`;
+      }
+
+      customerOrders[customer].push(description);
+    }
+  }
+
+  for (const [customer, items] of Object.entries(customerOrders)) {
+    items.forEach(item => {
+      rows.push({
+        Client: customer,
+        Producte: item
+      });
+    });
+  }
+
+  // Empty row to separate
+  rows.push({});
+  rows.push({ Client: '--- Resum ---' });
+
+  // 2. Summary (same as in modal)
+  // Pressecs
+  Object.entries(fruitSummary.pressecs).forEach(([key, list]) => {
     const [type, size] = key.split("-");
+    const total = list.reduce((acc, x) => acc + x.qty, 0);
     rows.push({
-      Fruit: `Pressec ${type}`,
-      Calibre: size,
-      Quantitat: `${qty} caixes`
+      Client: `Pressec ${type} ${size}`,
+      Producte: `${total} caixes`
     });
   });
 
-  // Albercoc and Cirera
+  // Albercoc / Cirera
   ["albercoc", "cirera"].forEach(fruit => {
-    Object.entries(fruitSummary[fruit]).forEach(([weight, count]) => {
-      if (count > 0) {
+    Object.entries(fruitSummary[fruit]).forEach(([weight, list]) => {
+      if (list.length > 0) {
         rows.push({
-          Fruit: capitalize(fruit),
-          Pes: `${weight}kg`,
-          Quantitat: `${count} comandes`
+          Client: `${capitalize(fruit)} ${weight}kg`,
+          Producte: `${list.length} comandes`
         });
       }
     });
   });
 
-  // Melo & Sindria
-  if (fruitSummary.melo > 0) {
-    rows.push({ Fruit: "Meló", Quantitat: `${fruitSummary.melo} peces` });
-  }
-  if (fruitSummary.sindria > 0) {
-    rows.push({ Fruit: "Síndria", Quantitat: `${fruitSummary.sindria} peces` });
-  }
+  // Melo / Sindria
+  ["melo", "sindria"].forEach(fruit => {
+    const total = fruitSummary[fruit].reduce((acc, x) => acc + x.qty, 0);
+    if (total > 0) {
+      rows.push({
+        Client: capitalize(fruit),
+        Producte: `${total} peces`
+      });
+    }
+  });
 
+  // Export
   const worksheet = XLSX.utils.json_to_sheet(rows);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Resum");
-
-  XLSX.writeFile(workbook, "resum_fruita.xlsx");
+  let filename = "resum_fruita.xlsx";
+  if (filterDate && filterPlace !== "Tots els llocs") {
+    filename = `resum_${filterPlace.replace(/\s+/g, '')}_${filterDate}.xlsx`;
+  } else if (filterDate) {
+    filename = `resum_${filterDate}.xlsx`;
+  } else if (filterPlace !== "Tots els llocs") {
+    filename = `resum_${filterPlace.replace(/\s+/g, '')}.xlsx`;
+  }
+  XLSX.writeFile(workbook, filename);
 }
+
   
 
 
@@ -91,49 +141,59 @@ function OrderListPage() {
   });
 
   const fruitSummary = {
-    pressecs: {}, // key = type + size
-    albercoc: { "1": 0, "2": 0 },
-    cirera: { "1": 0, "2": 0 },
-    melo: 0,
-    sindria: 0
-  };
+  pressecs: {}, 
+  albercoc: { "1": [], "2": [] },
+  cirera: { "1": [], "2": [] },
+  melo: [],
+  sindria: []
+};
 
-  for (const order of filteredOrders) {
-    for (const item of order.fruits) {
-      const { fruit, size, qty, weight } = item;
+for (const order of filteredOrders) {
+  for (const item of order.fruits) {
+    const { fruit, size, qty, weight } = item;
+    const customer = order.customer;
 
-      if (fruit.startsWith("pressec")) {
-        const variant = fruit.split("_")[1]; // groc, vermell, barrejat
-        const key = `${variant}-${size}`;
-        fruitSummary.pressecs[key] = (fruitSummary.pressecs[key] || 0) + qty;
-      }
+    if (fruit.startsWith("pressec")) {
+      const variant = fruit.split("_")[1];
+      const key = `${variant}-${size}`;
+      if (!fruitSummary.pressecs[key]) fruitSummary.pressecs[key] = [];
+      fruitSummary.pressecs[key].push({ customer, qty });
+    }
 
-      if (fruit === "albercoc" || fruit === "cirera") {
-        if (weight === 1 || weight === 2) {
-          fruitSummary[fruit][weight] += 1;
-        }
-      }
-
-      if (fruit === "melo") {
-        fruitSummary.melo += qty;
-      }
-
-      if (fruit === "sindria") {
-        fruitSummary.sindria += qty;
+    if (fruit === "albercoc" || fruit === "cirera") {
+      if (weight === 1 || weight === 2) {
+        fruitSummary[fruit][weight].push({ customer, qty });
       }
     }
+
+    if (fruit === "melo") {
+      fruitSummary.melo.push({ customer, qty });
+    }
+
+    if (fruit === "sindria") {
+      fruitSummary.sindria.push({ customer, qty });
+    }
   }
+}
+
 
 
   return (
     <div className="p-4 max-w-md mx-auto">
-      <h1 className="text-2xl font-bold mb-4 text-center">Família Esteve Ràfols</h1>
-
+    <div className="flex items-center justify-center mb-4">
+      <img
+        src="/logopressec1.png"
+        alt="Logo"
+        className="h-15 w-15 mr-2"
+        style={{ objectFit: "contain" }}
+      />
+      <h1 className="text-2xl font-bold text-center">Família Esteve Ràfols</h1>
+    </div>
       <button
         onClick={() => navigate('/add')}
-        className="w-full bg-black text-white py-2 rounded-lg mb-4"
+        className="w-full bg-black text-white py-2 rounded-lg mb-4 flex items-center justify-center"
       >
-        <Plus className="inline-block w-4 h-4 mr-1" />
+        <Plus className="inline-block w-5 h-5 mr-2 " />
 Afegir Comanda
 
       </button>
@@ -158,72 +218,93 @@ Afegir Comanda
           <option>La Girada</option>
         </select>
       </div>
+<div className="flex gap-2 mb-4">
+  <button 
+    onClick={() => setShowSummary(true)}
+    className="flex-1 bg-blue-500 text-white px-3 py-2 rounded flex items-center justify-center"
+  >
+    <Package className="w-5 h-5 mr-2 inline-block align-middle" />
+    Veure resum
+  </button>
+  <button
+    onClick={handleExport}
+    className="flex-1 bg-green-500 text-white px-3 py-2 rounded flex items-center justify-center"
+  >
+    <Sheet className="w-5 h-5 mr-2 inline-block align-middle" />
+    Exportar Excel
+  </button>
+</div>
 
-      <button
-        onClick={() => setShowSummary(true)}
-        className="bg-blue-500 text-white px-3 py-1 rounded mb-4"
-      >
-        <Package className="inline-block w-4 h-4 mr-1" />
-Veure resum
-
-      </button>
-      <button
-  onClick={handleExport}
-  className="bg-green-500 text-white px-3 py-1 rounded mb-4 ml-2"
->
-  ⬇️ Exportar Excel
-</button>
 
 
       {showSummary && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-md p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-lg">
-            <h2 className="text-xl font-semibold mb-4">📦 Resum</h2>
+            <h2 className="text-xl font-semibold mb-4 rounded flex items-center justify-center  "><Package className="w-5 h-5 mr-2 inline-block align-middle" /> Resum</h2>
 
             {/* Pressecs */}
             {Object.keys(fruitSummary.pressecs).length > 0 && (
-              <div className="mb-3">
-                <strong>Pressecs:</strong>
-                <ul className="ml-4 list-disc">
-                  {Object.entries(fruitSummary.pressecs).map(([key, qty]) => {
+              <div className="mt-2">
+                <strong className="block mb-1">Pressecs:</strong>
+                {Object.entries(fruitSummary.pressecs)
+                  .sort(([a], [b]) => parseInt(a.split("-")[1]) - parseInt(b.split("-")[1])) // sort by calibre
+                  .map(([key, list]) => {
                     const [type, size] = key.split("-");
+                    const total = list.reduce((sum, x) => sum + x.qty, 0);
                     return (
-                      <li key={key}>{`Pressec ${type} calibre ${size}: ${qty} caixes`}</li>
+                      <details key={key} className="ml-4 mb-2">
+                        <summary>Pressec {type} {size}: {total} caixes</summary>
+                        <ul className="ml-4 text-sm list-disc">
+                          {list.map((entry, i) => (
+                            <li key={i}>{entry.qty}: {entry.customer}</li>
+                          ))}
+                        </ul>
+                      </details>
                     );
                   })}
-                </ul>
               </div>
             )}
 
-            {/* Albercoc */}
-            {(fruitSummary.albercoc["1"] > 0 || fruitSummary.albercoc["2"] > 0) && (
-              <div className="mb-3">
-                <strong>Albercoc:</strong>
-                <ul className="ml-4 list-disc">
-                  {fruitSummary.albercoc["1"] > 0 && <li>1kg: {fruitSummary.albercoc["1"]} comandes</li>}
-                  {fruitSummary.albercoc["2"] > 0 && <li>2kg: {fruitSummary.albercoc["2"]} comandes</li>}
-                </ul>
-              </div>
-            )}
+            {/* Albercoc + Cirera */}
+            {["albercoc", "cirera"].map(fruit => (
+              Object.entries(fruitSummary[fruit]).some(([, list]) => list.length > 0) && (
+                <div key={fruit} className="mt-2">
+                  <strong className="block mb-1 capitalize">{fruit}:</strong>
+                  {["1", "2"].map(weight => {
+                    const list = fruitSummary[fruit][weight];
+                    if (list.length === 0) return null;
+                    const total = list.reduce((acc, x) => acc + x.qty, 0);
+                    return (
+                      <details key={weight} className="ml-4 mb-2">
+                        <summary>{weight}kg: {list.length} comandes</summary>
+                        <ul className="ml-4 text-sm list-disc">
+                          {list.map((entry, i) => (
+                            <li key={i}>{entry.qty}: {entry.customer}</li>
+                          ))}
+                        </ul>
+                      </details>
+                    );
+                  })}
+                </div>
+              )
+            ))}
 
-            {/* Cirera */}
-            {(fruitSummary.cirera["1"] > 0 || fruitSummary.cirera["2"] > 0) && (
-              <div className="mb-3">
-                <strong>Cirera:</strong>
-                <ul className="ml-4 list-disc">
-                  {fruitSummary.cirera["1"] > 0 && <li>1kg: {fruitSummary.cirera["1"]} comandes</li>}
-                  {fruitSummary.cirera["2"] > 0 && <li>2kg: {fruitSummary.cirera["2"]} comandes</li>}
-                </ul>
-              </div>
-            )}
-
-            {/* Melo + Sindria */}
-            {fruitSummary.melo > 0 && (
-              <div className="mb-3"><strong>Meló:</strong> {fruitSummary.melo} peces</div>
-            )}
-            {fruitSummary.sindria > 0 && (
-              <div className="mb-3"><strong>Síndria:</strong> {fruitSummary.sindria} peces</div>
-            )}
+            {/* Melo & Sindria */}
+            {["melo", "sindria"].map(fruit => (
+              fruitSummary[fruit].length > 0 && (
+                <div key={fruit} className="mt-2">
+                  <strong className="block mb-1 capitalize">{fruit}:</strong>
+                  <details className="ml-4 mb-2">
+                    <summary>{fruitSummary[fruit].reduce((acc, x) => acc + x.qty, 0)} peces</summary>
+                    <ul className="ml-4 text-sm list-disc">
+                      {fruitSummary[fruit].map((entry, i) => (
+                        <li key={i}>{entry.qty}: {entry.customer}</li>
+                      ))}
+                    </ul>
+                  </details>
+                </div>
+              )
+            ))}
 
             <div className="text-right mt-4">
               <button onClick={() => setShowSummary(false)} className="px-3 py-1 rounded bg-gray-300 hover:bg-gray-400">

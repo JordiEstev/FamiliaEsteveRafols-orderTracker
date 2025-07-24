@@ -1,19 +1,23 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [
+    tailwindcss(),
     react(),
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
         name: 'Família Esteve Ràfols',
-        short_name: 'FruitTracker',
+        short_name: 'Comandes',
         start_url: '/',
         display: 'standalone',
-        background_color: '#ffffff',
-        theme_color: '#10b981',
+        theme_color: "#ffffff",
+        background_color: "#ffffff",
+
+
         icons: [
           {
             src: '/icon-192.png',
