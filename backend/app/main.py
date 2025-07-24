@@ -137,16 +137,19 @@ class OrderOut(BaseModel):
         orm_mode = True
 
 # ---------- FastAPI ----------
-app = FastAPI(title="Fruit Order Tracker (Simplified)")
+app = FastAPI()
 
-
+origins = [
+    "https://familia-esteve-rafols-order-tracker-silk.vercel.app",
+    "http://localhost:5173",  # for local dev
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    allow_credentials=True,
 )
 
 def get_db():
