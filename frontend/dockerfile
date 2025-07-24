@@ -1,14 +1,20 @@
-# ---- build stage ----
+# 1️⃣ Build React front-end
 FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build                # ➜ static files in /app/dist
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm install
+COPY frontend .
+RUN npm run build
 
-# ---- runtime stage ----
-FROM nginx:1.27-alpine
-COPY --from=builder /app/dist /usr/share/nginx/html
-# tell nginx to listen on 80 by default
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+# 2️⃣ Build FastAPI back-end
+FROM python:3.11-slim AS backend
+WORKDIR /app
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# copy React build into /app/static
+COPY --from=builder /app/frontend/dist ./static
+COPY backend .
+
+# 3️⃣ Start uvicorn + serve static
+CMD ["uvicorn", "main:app", "--host=0.0.0.0", "--port=8000"]

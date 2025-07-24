@@ -139,6 +139,8 @@ class OrderOut(BaseModel):
 # ---------- FastAPI ----------
 app = FastAPI(title="Fruit Order Tracker (Simplified)")
 
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],

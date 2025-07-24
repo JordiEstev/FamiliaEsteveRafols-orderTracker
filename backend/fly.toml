@@ -1,0 +1,22 @@
+app = "esteve-rafols-app"
+
+[env]
+  PYTHONUNBUFFERED = "1"
+
+[[mounts]]
+  source      = "orders_data"
+  destination = "/app/data"
+
+# 👇  tell Fly how to forward traffic
+[http_service]
+  internal_port = 8080          # <-- the port uvicorn now listens on
+  force_https   = true
+
+  [[http_service.ports]]
+    port     = 80
+    handlers = ["http"]
+
+  [[http_service.ports]]
+    port     = 443
+    handlers = ["tls", "http"]
+  
