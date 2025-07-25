@@ -5,15 +5,38 @@ import FruitSelectorModal from "../components/FruitSelectorModal";
 export default function AddOrderPage() {
   const navigate = useNavigate();
   const [openFruitModal, setOpenFruitModal] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [showError, setShowError] = useState(false);
+  const [fruits, setFruits] = useState([]);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
+
+
 
   const [form, setForm] = useState({
     customer: "",
     date: "",
-    place: "Cantallops", 
+    place: "", 
     notes: ""
   });
 
-  const [fruits, setFruits] = useState([]);
+
+  function flashError(message) {
+    setFormError(message);
+    setShowError(true);
+    setTimeout(() => {
+      setShowError(false);
+    }, 1500);
+  }
+
+  function flashSuccess(message) {
+    setSuccessMessage(message);
+    setShowSuccess(true);
+    setTimeout(() => {
+      setShowSuccess(false);
+    }, 1500);
+  }
+
 
   const handleBasicChange = (e) => {
     const { name, value } = e.target;
@@ -30,10 +53,17 @@ export default function AddOrderPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!fruits.length) {
-      alert("Afegiu almenys una fruita.");
+
+    if (!form.place) {
+      flashError("Cal triar un lloc.");
       return;
     }
+
+    if (!fruits.length) {
+      flashError("Afegiu almenys una fruita.");
+      return;
+    }
+
     const payload = {
       customer: form.customer,
       date: form.date,
@@ -58,11 +88,11 @@ export default function AddOrderPage() {
       return res.json();
     })
     .then(() => {
-      navigate("/");  // Only navigate if success
+      navigate("/", { state: { successMessage: "Comanda guardada correctament!" } });
     })
     .catch(err => {
       console.error("Error saving order:", err);
-      alert("Hi ha hagut un error en guardar la comanda.");
+      flashError("Hi ha hagut un error en guardar la comanda.");
     });
 
 
@@ -70,10 +100,26 @@ export default function AddOrderPage() {
 
   return (
     <div className="bg-gray-950 min-h-screen text-gray-100 p-5 font-sans">
+      {showSuccess && (
+        <div className="fixed top-3 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="bg-green-600 text-white px-4 py-2 rounded shadow-lg text-center">
+            {successMessage}
+          </div>
+        </div>
+      )}
+
+      {showError && (
+        <div className="fixed top-3 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="bg-red-500 text-white px-4 py-2 rounded shadow-lg text-center">
+            {formError}
+          </div>
+        </div>
+      )}
       <form
         onSubmit={handleSubmit}
         className="max-w-md mx-auto bg-gray-900 border border-gray-800 rounded-xl shadow p-5 space-y-5"
       >
+
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <span className="text-violet-500 text-3xl">+</span> Nova Comanda
         </h1>
@@ -110,6 +156,9 @@ export default function AddOrderPage() {
             onChange={handleBasicChange}
             className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500"
           >
+             <option value="" disabled hidden className="text-gray-400">
+              Tria un lloc
+            </option>
             <option>Sant Pau</option>
             <option>Cantallops</option>
             <option>Vilafranca</option>
@@ -201,6 +250,7 @@ export default function AddOrderPage() {
     </div>
   );
 }
+
 
 function renderFruitLabel(item) {
   if (item.fruit.startsWith("pressec_")) {

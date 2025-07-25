@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import FruitSelectorModal from "../components/FruitSelectorModal"; // adjust if path differs
+import { Pencil} from "lucide-react";
+
 
 export default function EditOrderPage() {
   const navigate = useNavigate();
@@ -8,12 +10,29 @@ export default function EditOrderPage() {
   const [form, setForm] = useState({
     customer: "",
     date: "",
-    place: "Cantallops",
+    place: "",
     notes: ""
   });
   const [fruits, setFruits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openFruitModal, setOpenFruitModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  // Flash success and error messages
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => setSuccessMessage(""), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
+
+  useEffect(() => {
+    if (errorMessage) {
+      const timer = setTimeout(() => setErrorMessage(""), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [errorMessage]);
 
   // Fetch order by ID
   useEffect(() => {
@@ -33,8 +52,8 @@ export default function EditOrderPage() {
       })
       .catch(err => {
         console.error("Error loading order:", err);
-        alert("No s'ha pogut carregar la comanda.");
-        navigate("/");
+        setErrorMessage("No s'ha pogut carregar la comanda.");
+        setTimeout(() => navigate("/"), 2000);
       });
   }, [id]);
 
@@ -46,7 +65,7 @@ export default function EditOrderPage() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!fruits.length) {
-      alert("Afegiu almenys una fruita.");
+      setErrorMessage("Afegiu almenys una fruita.");
       return;
     }
     const payload = {
@@ -69,11 +88,11 @@ export default function EditOrderPage() {
         return res.json();
       })
       .then(() => {
-        navigate("/");
+        navigate("/", { state: { successMessage: "Comanda actualitzada correctament." } });
       })
       .catch(err => {
         console.error("Error updating:", err);
-        alert("Error en actualitzar la comanda.");
+        setErrorMessage("Error en actualitzar la comanda.");
       });
   };
 
@@ -84,12 +103,28 @@ export default function EditOrderPage() {
 
   return (
     <div className="bg-gray-950 min-h-screen text-gray-100 p-5 font-sans">
+      {successMessage && (
+        <div className="fixed top-3 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="bg-green-600 text-white px-4 py-2 rounded shadow-lg text-center">
+            {successMessage}
+          </div>
+        </div>
+      )}
+      {errorMessage && (
+        <div className="fixed top-3 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="bg-red-600 text-white px-4 py-2 rounded shadow-lg text-center">
+            {errorMessage}
+          </div>
+        </div>
+      )}
+
       <form
         onSubmit={handleSubmit}
         className="max-w-md mx-auto bg-gray-900 border border-gray-800 rounded-xl shadow p-5 space-y-5"
       >
         <h1 className="text-2xl font-bold flex items-center gap-2">
-          ✏️ Editar Comanda
+              <Pencil className="w-7 h-7" />
+           Editar Comanda
         </h1>
 
         <div className="space-y-1">
@@ -209,12 +244,12 @@ export default function EditOrderPage() {
 
 function renderFruitLabel(item) {
   if (item.fruit === "pressec_barrejat") {
-  return "Pressec barrejat";
-    }
-    if (item.fruit.startsWith("pressec_")) {
+    return "Pressec barrejat";
+  }
+  if (item.fruit.startsWith("pressec_")) {
     const variant = item.fruit.split("_")[1];
     return `Pressec ${variant}`;
-    }
+  }
 
   const map = {
     albercoc: "Albercoc",
