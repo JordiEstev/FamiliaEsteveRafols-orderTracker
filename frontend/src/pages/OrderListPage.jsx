@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Package, Pencil, Trash2, Sheet } from "lucide-react";
+import { Plus, Package, Pencil, Trash2, Sheet, ClockArrowDown, ClockArrowUp} from "lucide-react";
 import * as XLSX from 'xlsx';
 import { useLocation } from 'react-router-dom';
 
@@ -9,19 +9,20 @@ import { useLocation } from 'react-router-dom';
 
 function OrderListPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [orders, setOrders] = useState([]);
   const [search, setSearch] = useState("");
   const today = new Date().toISOString().split('T')[0];
-  const [filterDate, setFilterDate] = useState(today);
+  const [filterDate, setFilterDate] = useState('');
   const [filterPlace, setFilterPlace] = useState("Tots els llocs");
   const [showSummary, setShowSummary] = useState(false);
-  const location = useLocation();
-  const [showSuccess, setShowSuccess] = useState(!!location.state?.successMessage);
-  const [successMessage] = useState(location.state?.successMessage || "");
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState(location.state?.successMessage || "");
   const [error, setError] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState(null);
-
+  const [sortNewestFirst, setSortNewestFirst] = useState(true);
+  const [sortMessage, setSortMessage] = useState("");
 
 
 
@@ -129,7 +130,16 @@ function handleExport() {
   XLSX.writeFile(workbook, filename);
 }
 
-  
+
+function formatFullDate(isoDateStr) {
+  const date = new Date(isoDateStr);
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}/${month}/${year} ${hours}:${minutes}`;
+}
 
 
 useEffect(() => {
@@ -151,13 +161,27 @@ useEffect(() => {
     });
 }, []);
 
-
-  useEffect(() => {
-  if (showSuccess) {
-    const timer = setTimeout(() => {
-      setShowSuccess(false);
-    }, 1500);
+useEffect(() => {
+  if (sortMessage) {
+    const timer = setTimeout(() => setSortMessage(""), 2000);
     return () => clearTimeout(timer);
+  }
+}, [sortMessage]);
+
+  
+useEffect(() => {
+  if (location.state?.successMessage) {
+    setShowSuccess(true);
+
+    // Clear the success message from location.state after showing it
+    navigate(location.pathname, { replace: true, state: {} });
+  }
+}, [location, navigate]); 
+
+useEffect(() => {
+  if (showSuccess) {
+    const timer = setTimeout(() => setShowSuccess(false), 1500);
+    return () => clearTimeout(timer);                   
   }
 }, [showSuccess]);
 
@@ -195,12 +219,20 @@ const handleDelete = (orderId) => {
   setOrderToDelete(orderId); // Just open the modal and store ID
 };
 
-  const filteredOrders = orders.filter(order => {
+const filteredOrders = orders
+  .filter(order => {
     const matchesName = order.customer.toLowerCase().includes(search.toLowerCase());
     const matchesDate = filterDate === "" || order.date === filterDate;
     const matchesPlace = filterPlace === "Tots els llocs" || order.place === filterPlace;
     return matchesName && matchesDate && matchesPlace;
-  });
+  })
+  .sort((a, b) => {
+  return sortNewestFirst
+    ? new Date(b.created_at) - new Date(a.created_at)
+    : new Date(a.created_at) - new Date(b.created_at);
+});
+
+
 
   const fruitSummary = {
     pressecs: {},
@@ -241,11 +273,11 @@ const handleDelete = (orderId) => {
 
 
 
-  return (
-    
-    <div className="p-4 max-w-md mx-auto">
+return (
+  <>
+    {/* Popup Messages */}
     {showSuccess && (
-      <div className="fixed top-3 left-1/2 transform -translate-x-1/2 z-50">
+      <div className="fixed top-3 inset-x-0 flex justify-center z-50">
         <div className="bg-green-600 text-white px-4 py-2 rounded shadow-lg text-center">
           {successMessage}
         </div>
@@ -253,14 +285,21 @@ const handleDelete = (orderId) => {
     )}
 
     {error && (
-      <div className="fixed top-3 left-1/2 transform -translate-x-1/2 z-50">
+      <div className="fixed top-3 inset-x-0 flex justify-center z-50">
         <div className="bg-red-600 text-white px-4 py-2 rounded shadow-lg text-center">
           {error}
         </div>
       </div>
     )}
 
-
+    {sortMessage && (
+      <div className="fixed top-3 inset-x-0 flex justify-center z-50">
+        <div className="bg-blue-600 text-white px-4 py-2 rounded shadow-lg text-center">
+          {sortMessage}
+        </div>
+      </div>
+    )}
+  <div className="p-4 max-w-md mx-auto">
     <div className="flex items-center justify-center mb-4">
       <img
         src="/logopressec1.png"
@@ -282,7 +321,7 @@ Afegir Comanda
       <div className="mb-2">
         <input
           type="text"
-          placeholder="Cerca un client..."
+          placeholder="Busca un client..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="p-2 border rounded w-full"
@@ -309,6 +348,22 @@ Afegir Comanda
           <option>Vilafranca</option>
           <option>La Girada</option>
         </select>
+        <button
+          onClick={() => {
+            const newVal = !sortNewestFirst;
+            setSortNewestFirst(newVal);
+            setSortMessage(
+              newVal
+                ? "Comandes més recents primer"
+                : "Comandes més antigues primer"
+            );
+          }}
+          className="flex items-center gap-2 px-3 py-2 border rounded text-sm bg-gray-100 hover:bg-gray-200 whitespace-nowrap"
+        >
+          {sortNewestFirst ? <ClockArrowDown className="w-5 h-5" /> : <ClockArrowUp className="w-5 h-5" />}
+        </button>
+
+
       </div>
 <div className="flex gap-2 mb-4">
   <button 
@@ -332,7 +387,13 @@ Afegir Comanda
       {showSummary && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-md p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-lg">
-            <h2 className="text-xl font-semibold mb-4 rounded flex items-center justify-center  "><Package className="w-5 h-5 mr-2 inline-block align-middle" /> Resum</h2>
+            <h2 className="text-xl font-semibold mb-1 rounded flex items-center justify-center">
+              <Package className="w-5 h-5 mr-2 inline-block align-middle" /> 
+              Resum {filterPlace !== "Tots els llocs" && `${filterPlace}`} 
+              {filterPlace !== "Tots els llocs" && filterDate && " · "} 
+              {filterDate && formatDate(filterDate)}
+            </h2>
+
 
             {/* Pressecs */}
             {Object.keys(fruitSummary.pressecsGrouped).length > 0 && (
@@ -350,7 +411,7 @@ Afegir Comanda
                           typeTotal += subtotal;
                           return (
                             <details key={size} className="ml-4">
-                              <summary>{size}: {subtotal} caixes</summary>
+                              <summary>{size}: {subtotal} {subtotal === 1 ? "caixa" : "caixes"}</summary>
                               <ul className="ml-4 text-sm list-disc">
                                 {list.map((entry, i) => (
                                   <li key={i}>{entry.qty}: {entry.customer}</li>
@@ -359,15 +420,23 @@ Afegir Comanda
                             </details>
                           );
                         })}
-                      <div className="ml-4 text-sm font-semibold">Total {type}: {typeTotal} caixes</div>
+                      <div className="ml-4 text-sm font-semibold">
+                        Total {type}: {typeTotal} {typeTotal === 1 ? "caixa" : "caixes"}
+                      </div>
+
                     </div>
                   );
                 })}
-                <div className="ml-2 font-bold mt-2">
-                  Total pressecs: {
-                    Object.values(fruitSummary.pressecs).flat().reduce((acc, x) => acc + x.qty, 0)
-                  } caixes
-                </div>
+
+                {(() => {
+                  const totalPressecs = Object.values(fruitSummary.pressecs).flat().reduce((acc, x) => acc + x.qty, 0);
+                  return (
+                    <div className="ml-2 font-bold mt-2">
+                      Total pressecs: {totalPressecs} {totalPressecs === 1 ? "caixa" : "caixes"}
+                    </div>
+                  );
+                })()}
+
               </div>
             )}
 
@@ -417,7 +486,13 @@ Afegir Comanda
                 <div key={fruit} className="mt-2">
                   <strong className="block mb-1 capitalize">{fruit}:</strong>
                   <details className="ml-4 mb-2">
-                    <summary>{fruitSummary[fruit].reduce((acc, x) => acc + x.qty, 0)} peces</summary>
+                    <summary>
+                      {(() => {
+                        const total = fruitSummary[fruit].reduce((acc, x) => acc + x.qty, 0);
+                        return `${total} ${total === 1 ? "peça" : "peces"}`;
+                      })()}
+                    </summary>
+
                     <ul className="ml-4 text-sm list-disc">
                       {fruitSummary[fruit].map((entry, i) => (
                         <li key={i}>{entry.qty}: {entry.customer}</li>
@@ -442,7 +517,11 @@ Afegir Comanda
         <div className="text-gray-500 text-center">No hi ha comandes.</div>
       ) : (
         filteredOrders.map(order => (
-          <div key={order.id} className="border p-3 rounded shadow-sm mb-4">
+          <div key={order.id} className="relative border p-3 rounded shadow-sm mb-4">
+
+              <div className="absolute top-2 right-2 text-xs text-gray-500">
+                {formatFullDate(order.created_at)}
+              </div>
             <strong>{order.customer}</strong><br />
             {order.fruits.map((fruit, idx) => (
               <div key={idx}>{renderFruitDetails(fruit)}</div>
@@ -503,14 +582,15 @@ Afegir Comanda
 )}
 
     </div>
-    
+    </>
   );
 }
 
 function renderFruitDetails(item) {
-  if (item.fruit.startsWith("pressec_")) {
+    if (item.fruit.startsWith("pressec_")) {
     const variant = item.fruit.split("_")[1];
-    return `Préssec ${variant}: ${item.qty} caixes ${item.size}`;
+    const label = item.qty === 1 ? "caixa" : "caixes";
+    return `Préssec ${variant}: ${item.qty} ${label} ${item.size}`;
   }
   
   if (item.fruit === "albercoc" || item.fruit === "cirera") {

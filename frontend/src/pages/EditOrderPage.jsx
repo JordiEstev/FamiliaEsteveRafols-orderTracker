@@ -88,7 +88,7 @@ export default function EditOrderPage() {
         return res.json();
       })
       .then(() => {
-        navigate("/", { state: { successMessage: "Comanda actualitzada correctament." } });
+        navigate("/", { state: { successMessage: "Comanda actualitzada correctament" } });
       })
       .catch(err => {
         console.error("Error updating:", err);
@@ -261,15 +261,26 @@ function renderFruitLabel(item) {
 }
 
 function renderFruitDetails(item) {
-  if (item.fruit.startsWith("pressec_")) {
-    return `${item.qty} caixes · calibre ${item.size}`;
+    if (item.fruit.startsWith("pressec_")) {
+    const variant = item.fruit.split("_")[1];
+    const label = item.qty === 1 ? "caixa" : "caixes";
+    return `Préssec ${variant}: ${item.qty} ${label} ${item.size}`;
   }
+  
   if (item.fruit === "albercoc" || item.fruit === "cirera") {
-    const total = item.qty * item.weight;
-    return `${item.qty} × ${item.weight} kg = ${total} kg`;
+    const singular = item.weight === 1 ? "Tarrina" : "Caixa";
+    const plural = item.weight === 1 ? "Tarrines" : "Caixes";
+    const label = item.qty > 1 ? plural : singular;
+    return `${capitalize(item.fruit)}: ${item.qty} ${label} (${item.weight}kg)`;
   }
-  if (item.fruit === "melo" || item.fruit === "sindria") {
-    return `${item.qty} peces${item.weight ? ` · ${item.weight} kg` : ''}`;
+
+   if (item.fruit === "melo" || item.fruit === "sindria") {
+    const label = item.qty === 1 ? "peça" : "peces";
+    return `${capitalize(item.fruit)}: ${item.qty} ${label}${item.weight ? ` · ${item.weight} kg` : ''}`;
   }
-  return "";
+
+}
+
+function capitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
 }
