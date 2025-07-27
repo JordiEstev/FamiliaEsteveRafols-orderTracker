@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Package, Pencil, Trash2, Sheet, ClockArrowDown, ClockArrowUp} from "lucide-react";
 import * as XLSX from 'xlsx';
 import { useLocation } from 'react-router-dom';
+import './OrderListPage.css'; // Add this import for custom styles
 
 
 
@@ -277,28 +278,23 @@ return (
   <>
     {/* Popup Messages */}
     {showSuccess && (
-      <div className="fixed top-3 inset-x-0 flex justify-center z-50">
-        <div className="bg-green-600 text-white px-4 py-2 rounded shadow-lg text-center">
-          {successMessage}
-        </div>
-      </div>
-    )}
+  <div className="fixed top-3 inset-x-0 flex justify-center z-50">
+    <div className="popup-message success">{successMessage}</div>
+  </div>
+)}
 
-    {error && (
-      <div className="fixed top-3 inset-x-0 flex justify-center z-50">
-        <div className="bg-red-600 text-white px-4 py-2 rounded shadow-lg text-center">
-          {error}
-        </div>
-      </div>
-    )}
+{error && (
+  <div className="fixed top-3 inset-x-0 flex justify-center z-50">
+    <div className="popup-message error">{error}</div>
+  </div>
+)}
 
-    {sortMessage && (
-      <div className="fixed top-3 inset-x-0 flex justify-center z-50">
-        <div className="bg-blue-600 text-white px-4 py-2 rounded shadow-lg text-center">
-          {sortMessage}
-        </div>
-      </div>
-    )}
+{sortMessage && (
+  <div className="fixed top-3 inset-x-0 flex justify-center z-50">
+    <div className="popup-message info">{sortMessage}</div>
+  </div>
+)}
+
   <div className="p-4 max-w-md mx-auto">
     <div className="flex items-center justify-center mb-4">
       <img
