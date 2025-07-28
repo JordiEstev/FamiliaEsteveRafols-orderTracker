@@ -4,6 +4,7 @@ import { Plus, Package, Pencil, Trash2, Sheet, ClockArrowDown, ClockArrowUp} fro
 import * as XLSX from 'xlsx';
 import { useLocation } from 'react-router-dom';
 import './OrderListPage.css'; // Add this import for custom styles
+import { motion, AnimatePresence } from "framer-motion";
 
 
 
@@ -24,6 +25,7 @@ function OrderListPage() {
   const [orderToDelete, setOrderToDelete] = useState(null);
   const [sortNewestFirst, setSortNewestFirst] = useState(true);
   const [sortMessage, setSortMessage] = useState("");
+  const [loading, setLoading] = useState(true); // Add this
 
 
 
@@ -151,7 +153,10 @@ useEffect(() => {
       }
       return res.json();
     })
-    .then(data => setOrders(data))
+    .then(data => {
+      setOrders(data);
+      setLoading(false);
+    })
     .catch(err => {
       console.error("Error loading orders:", err.message);
       if (err.message.includes("NetworkError") || err.message === "Failed to fetch") {
@@ -159,8 +164,10 @@ useEffect(() => {
       } else {
         setError("No s'han pogut carregar les comandes.");
       }
+      setLoading(false); 
     });
 }, []);
+
 
 useEffect(() => {
   if (sortMessage) {
@@ -508,48 +515,73 @@ Afegir Comanda
       </div>
       )}
 
-      {/* Orders from backend */}
-      {filteredOrders.length === 0 ? (
-        <div className="text-gray-500 text-center">No hi ha comandes.</div>
-      ) : (
-        filteredOrders.map(order => (
-          <div key={order.id} className="relative border p-3 rounded shadow-sm mb-4">
 
-              <div className="absolute top-2 right-2 text-xs text-gray-500">
-                {formatFullDate(order.created_at)}
-              </div>
-            <strong>{order.customer}</strong><br />
-            {order.fruits.map((fruit, idx) => (
-              <div key={idx}>{renderFruitDetails(fruit)}</div>
-            ))}
-            <span className="text-sm text-gray-500">
-              {formatDate(order.date)} · {order.place}
-            </span>
-             {order.notes?.trim() && (
-              <div className="mt-1 text-sm text-gray-600 italic">
-                Nota: {order.notes.trim()}
-              </div>
-            )}
-<div className="mt-2 flex gap-2">
-  <button
-    onClick={() => navigate(`/edit/${order.id}`)}
-    className="bg-white text-black border border-black px-3 py-1 rounded-lg text-sm flex items-center gap-1"
-  >
-    <Pencil className="w-4 h-4" />
-    Editar
-  </button>
-  <button
-    onClick={() => handleDelete(order.id)}
-    className="bg-white text-black border border-black px-3 py-1 rounded-lg text-sm flex items-center gap-1"
-  >
-    <Trash2 className="w-4 h-4" />
-    Eliminar
-  </button>
-</div>
+      {/*loading spinner */}
+      {loading ? (
+        <div className="flex justify-center items-center mt-10">
+          <div className="w-8 h-8 border-4 border-black-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+) : (
+  <>
+{filteredOrders.length === 0 ? (
+  <div className="text-gray-500 text-center">No hi ha comandes.</div>
+) : (
+<motion.div layout>
+<AnimatePresence mode="popLayout">
+  {filteredOrders.map((order) => (
+    console.log("Rendering order:", order), // Debug log
+    <motion.div
+      key={order.id}
+      layout
+      initial={{ opacity: 0, y: sortNewestFirst ? 20 : -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 10 }}
+transition={{ type: "spring", stiffness: 80, damping: 15, duration: 0.3 }}
 
-          </div>
-        ))
+      className="card order-card relative border p-3 rounded shadow-sm mb-4"
+    >
+      <div className="absolute top-2 right-2 text-xs text-gray-500">
+        {formatFullDate(order.created_at)}
+      </div>
+      <strong>{order.customer}</strong><br />
+      {order.fruits.map((fruit, idx) => (
+        <div key={idx}>{renderFruitDetails(fruit)}</div>
+      ))}
+      <span className="text-sm text-gray-500">
+        {formatDate(order.date)} · {order.place}
+      </span>
+      {order.notes?.trim() && (
+        <div className="mt-1 text-sm text-gray-600 italic">
+          Nota: {order.notes.trim()}
+        </div>
       )}
+      <div className="mt-2 flex gap-2">
+        <button
+          onClick={() => navigate(`/edit/${order.id}`)}
+          className="bg-white text-black border border-black px-3 py-1 rounded-lg text-sm flex items-center gap-1"
+        >
+          <Pencil className="w-4 h-4" />
+          Editar
+        </button>
+        <button
+          onClick={() => handleDelete(order.id)}
+          className="bg-white text-black border border-black px-3 py-1 rounded-lg text-sm flex items-center gap-1"
+        >
+          <Trash2 className="w-4 h-4" />
+          Eliminar
+        </button>
+      </div>
+    </motion.div>
+  ))}
+</AnimatePresence>
+</motion.div>
+
+)}
+</>
+)}
+
+
+
 
 
   {showConfirm && (
