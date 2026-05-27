@@ -20,15 +20,19 @@ function addDays(dateStr, n) {
   return d.toISOString().split("T")[0];
 }
 
+const DIES = ["Diumenge","Dilluns","Dimarts","Dimecres","Dijous","Divendres","Dissabte"];
+
 function getDateLabel(dateStr) {
-  const t = new Date().toISOString().split("T")[0];
+  if (!dateStr) return "Totes les dates";
+  const t  = new Date().toISOString().split("T")[0];
   const tm = new Date(Date.now() + 86400000).toISOString().split("T")[0];
   const yd = new Date(Date.now() - 86400000).toISOString().split("T")[0];
-  if (dateStr === t) return "Avui";
-  if (dateStr === tm) return "Dema";
+  if (dateStr === t)  return "Avui";
+  if (dateStr === tm) return "Demà";
   if (dateStr === yd) return "Ahir";
-  const [y, m, d] = dateStr.split("-");
-  return `${d}/${m}/${y}`;
+  const [, m, d] = dateStr.split("-");
+  const date = new Date(dateStr + "T00:00:00");
+  return `${DIES[date.getDay()]} ${d}/${m}`;
 }
 
 function formatDate(dateStr) {
@@ -199,7 +203,7 @@ export default function PickingListPage() {
       {/* ── Date navigation ── */}
       <div className="no-print picking-date-nav">
         <button onClick={() => setFilterDate(prev => addDays(prev || today, -1))} className="picking-arrow">&#8249;</button>
-        <div className="relative">
+        <div className="relative" style={{ flex: 1 }}>
           <button onClick={() => document.getElementById("pick-date").showPicker?.()} className="picking-date-btn">
             {filterDate ? getDateLabel(filterDate) : "Totes les dates"}
           </button>
@@ -213,7 +217,6 @@ export default function PickingListPage() {
           />
         </div>
         <button onClick={() => setFilterDate(prev => addDays(prev || today, 1))} className="picking-arrow">&#8250;</button>
-        <div className="picking-date-nav-spacer" />
         <button
           onClick={() => setHideDone(p => !p)}
           className={"picking-toggle " + (hideDone ? "picking-toggle-on" : "picking-toggle-off")}

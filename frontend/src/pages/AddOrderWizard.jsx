@@ -12,7 +12,7 @@ const PLACE_DATE_TYPE = {
   "El Pla":     "wednesday",
   "Puigdalber": "wednesday",
   "Sant Pau":   "weekend",
-  "Cantallops": "any",
+  "Cantallops": "friday",
 };
 
 const FRUIT_EMOJI = {
@@ -122,6 +122,11 @@ export default function AddOrderWizard() {
       { label: "Pròxim dissabte", value: getNextWeekday(6) },
       { label: "Pròxim diumenge", value: getNextWeekday(0) },
       { label: "Altra data",      value: "other" },
+    ];
+    if (type === "friday") return [
+      { label: "Pròxim divendres", value: getNextWeekday(5) },
+      { label: "Avui",             value: todayStr() },
+      { label: "Altra data",       value: "other" },
     ];
     return [
       { label: "Avui",        value: todayStr() },
