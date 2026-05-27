@@ -40,7 +40,7 @@ function formatDate(dateStr) {
   return `${d}/${m}`;
 }
 
-const today = new Date().toISOString().split("T")[0];
+const today = new Date().toLocaleDateString('sv', { timeZone: 'Europe/Madrid' });
 
 export default function PickingListPage() {
   const navigate = useNavigate();
@@ -248,13 +248,15 @@ export default function PickingListPage() {
         ))}
       </div>
 
-      {/* ── Nova Comanda ── */}
-      <div className="no-print picking-new-order-row">
-        <button onClick={handleNewOrder} className="picking-new-order-btn">
-          <Plus className="w-4 h-4" />
-          Nova comanda{filterPlace ? ` — ${filterPlace}` : ""}
-        </button>
-      </div>
+      {/* ── Nova Comanda (inline row, only visible if no place selected) ── */}
+      {!filterPlace && (
+        <div className="no-print picking-new-order-row">
+          <button onClick={handleNewOrder} className="picking-new-order-btn">
+            <Plus className="w-4 h-4" />
+            Nova comanda
+          </button>
+        </div>
+      )}
 
       {/* ── Save message ── */}
       {saveMsg && (
@@ -266,8 +268,18 @@ export default function PickingListPage() {
         <strong>{printTitle}</strong>
       </div>
 
+      {/* ── FAB: Nova Comanda ── */}
+      <button
+        onClick={handleNewOrder}
+        className="no-print fixed bottom-4 right-4 w-14 h-14 rounded-full text-white shadow-xl flex items-center justify-center z-30 transition-all active:scale-95 hover:brightness-110"
+        style={{ backgroundColor: "#F59E0B" }}
+        title={`Nova comanda${filterPlace ? ` — ${filterPlace}` : ""}`}
+      >
+        <Plus className="w-7 h-7" />
+      </button>
+
       {/* ── Content ── */}
-      <div className="picking-content">
+      <div className="picking-content" style={{ paddingBottom: '5rem' }}>
         {loading ? (
           <div className="picking-loading">
             <div className="picking-spinner"></div>

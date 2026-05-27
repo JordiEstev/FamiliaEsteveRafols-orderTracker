@@ -1,10 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Package, Pencil, Trash2, Sheet, ClockArrowDown, ClockArrowUp, ClipboardList, ChevronDown, Copy, Check } from "lucide-react";
+import {
+  Plus, Package, Pencil, Trash2, Sheet, ClockArrowDown, ClockArrowUp,
+  ClipboardList, ChevronDown, Copy, Check, ArrowUp, RotateCcw,
+} from "lucide-react";
 import * as XLSX from 'xlsx';
 import './OrderListPage.css';
 import { motion, AnimatePresence } from "framer-motion";
 import { renderFruitExportLine, PLACES } from "../utils/fruit";
+
+const CURRENT_YEAR = new Date().getFullYear();
 
 const DIES  = ["Diumenge","Dilluns","Dimarts","Dimecres","Dijous","Divendres","Dissabte"];
 const MESOS = ["Gener","Febrer","Març","Abril","Maig","Juny","Juliol","Agost","Setembre","Octubre","Novembre","Desembre"];
@@ -24,17 +29,67 @@ const FRUIT_CARD_STYLE = {
   sindria:  { bg: "#FFF1F2", border: "#FECDD3", numColor: "#E11D48" },
 };
 
+// ── Date helpers ──────────────────────────────────────────────────────────────
+
+function getTodayMadrid() {
+  return new Date().toLocaleDateString('sv', { timeZone: 'Europe/Madrid' });
+}
+
 function getDateLabelFull(dateStr) {
   if (!dateStr) return "";
-  const [, m, d] = dateStr.split("-");
+  const [y, m, d] = dateStr.split("-");
   const date = new Date(dateStr + "T00:00:00");
-  return `${DIES[date.getDay()]} ${parseInt(d)} de ${MESOS[parseInt(m) - 1].toLowerCase()}`;
+  const yearSuffix = parseInt(y) < CURRENT_YEAR ? ` ${y}` : '';
+  return `${DIES[date.getDay()]} ${parseInt(d)} de ${MESOS[parseInt(m) - 1].toLowerCase()}${yearSuffix}`;
 }
+
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const [y, mm, dd] = dateStr.split("-");
+  if (parseInt(y) < CURRENT_YEAR) return `${dd}/${mm}/${String(y).slice(2)}`;
+  return `${dd}/${mm}`;
+}
+
+function formatFullDate(isoStr) {
+  if (!isoStr) return "";
+  const date = new Date(isoStr);
+  const parts = new Intl.DateTimeFormat('ca-ES', {
+    timeZone: 'Europe/Madrid',
+    day: '2-digit', month: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const day    = parts.find(p => p.type === 'day')?.value ?? '??';
+  const month  = parts.find(p => p.type === 'month')?.value ?? '??';
+  const hour   = parts.find(p => p.type === 'hour')?.value ?? '??';
+  const minute = parts.find(p => p.type === 'minute')?.value ?? '??';
+  const yearInMadrid = parseInt(
+    new Intl.DateTimeFormat('en', { timeZone: 'Europe/Madrid', year: 'numeric' }).format(date)
+  );
+  const yearSuffix = yearInMadrid < CURRENT_YEAR ? `/${String(yearInMadrid).slice(2)}` : '';
+  return `${day}/${month}${yearSuffix} ${hour}:${minute}`;
+}
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split("T")[0];
+}
+
+function capitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 function OrderListPage() {
   const navigate = useNavigate();
-  const [orders, setOrders] = useState([]);
-  const today = new Date().toISOString().split("T")[0];
+  const today    = getTodayMadrid();
+
+  const [orders, setOrders]       = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState("");
+
   const [search, setSearch] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem("olist_filters") || "{}").search ?? ""; } catch { return ""; }
   });
@@ -44,100 +99,38 @@ function OrderListPage() {
   const [filterPlace, setFilterPlace] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem("olist_filters") || "{}").filterPlace ?? "Tots els llocs"; } catch { return "Tots els llocs"; }
   });
-  const [hidePicked, setHidePicked] = useState(false);
-  const [showSummary, setShowSummary] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
-  const [error, setError] = useState("");
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [orderToDelete, setOrderToDelete] = useState(null);
   const [sortNewestFirst, setSortNewestFirst] = useState(() => {
     try { const v = JSON.parse(sessionStorage.getItem("olist_filters") || "{}").sortNewestFirst; return v ?? true; } catch { return true; }
   });
-  const [sortMessage, setSortMessage] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [hidePicked, setHidePicked] = useState(false);
+
+  const [showSummary, setShowSummary]     = useState(false);
   const [expandedFruits, setExpandedFruits] = useState(new Set());
-  const [copySuccess, setCopySuccess] = useState(false);
+  const [copySuccess, setCopySuccess]     = useState(false);
 
-  function getDateLabel(dateStr) {
-    const t  = new Date().toISOString().split('T')[0];
-    const tm = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-    const yd = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-    const [, m, d] = dateStr.split('-');
-    const date = new Date(dateStr);
-    const diaSemana = DIES[date.getDay()];
-    const dia = parseInt(d);
-    const mes = MESOS[parseInt(m) - 1];
-    if (dateStr === t)  return `Avui · ${diaSemana} ${dia} ${mes}`;
-    if (dateStr === tm) return `Demà · ${diaSemana} ${dia} ${mes}`;
-    if (dateStr === yd) return `Ahir · ${diaSemana} ${dia} ${mes}`;
-    return `${diaSemana} ${dia} ${mes}`;
-  }
+  const [showSuccess, setShowSuccess]     = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [sortMessage, setSortMessage]     = useState("");
+  const [showConfirm, setShowConfirm]     = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState(null);
 
-  function addDays(dateStr, n) {
-    const d = new Date(dateStr);
-    d.setDate(d.getDate() + n);
-    return d.toISOString().split("T")[0];
-  }
+  // Pickup-undo toast state
+  const [pendingPickup, setPendingPickup] = useState(null);
+  // pendingPickup = { orderId, customerName, place, date }
+  const pickupTimerRef = useRef(null);
 
-  function handleExport() {
-    const rows = [];
-    const customerOrders = {};
-    for (const order of filteredOrders) {
-      const customer = order.customer;
-      if (!customerOrders[customer]) customerOrders[customer] = [];
-      for (const item of order.fruits) {
-        customerOrders[customer].push(renderFruitExportLine(item));
-      }
-    }
-    for (const [customer, items] of Object.entries(customerOrders)) {
-      items.forEach(item => rows.push({ Client: customer, Producte: item }));
-    }
-    rows.push({});
-    rows.push({ Client: "Resum" });
-    let totalPressec = 0;
-    Object.entries(fruitSummary.pressecsGrouped).forEach(([type, sizes]) => {
-      rows.push({ Client: `Pressec ${type}` });
-      let typeTotal = 0;
-      Object.entries(sizes).forEach(([size, list]) => {
-        const subtotal = list.reduce((acc, x) => acc + x.qty, 0);
-        typeTotal += subtotal;
-        rows.push({ Client: `  ${size}`, Producte: `${subtotal} caixes` });
-      });
-      totalPressec += typeTotal;
-      rows.push({ Producte: `Total: ${typeTotal} caixes` });
-    });
-    rows.push({ Producte: `Total pressecs: ${totalPressec} caixes` });
-    ["albercoc", "cirera"].forEach(fruit => {
-      const l1 = fruitSummary[fruit]["1"], l2 = fruitSummary[fruit]["2"];
-      if (l1.length > 0 || l2.length > 0) {
-        rows.push({ Client: capitalize(fruit) });
-        if (l1.length > 0) rows.push({ Client: "  Tarrina (1kg)", Producte: `${l1.reduce((a, x) => a + x.qty, 0)}` });
-        if (l2.length > 0) rows.push({ Client: "  Caixa (2kg)",   Producte: `${l2.reduce((a, x) => a + x.qty, 0)}` });
-      }
-    });
-    ["melo", "sindria"].forEach(fruit => {
-      const total = fruitSummary[fruit].reduce((acc, x) => acc + x.qty, 0);
-      if (total > 0) rows.push({ Client: capitalize(fruit), Producte: `${total} peces` });
-    });
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    const workbook  = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Resum");
-    let filename = "resum_fruita.xlsx";
-    if (filterDate && filterPlace !== "Tots els llocs") filename = `resum_${filterPlace.replace(/\s+/g,"")}_${filterDate}.xlsx`;
-    else if (filterDate) filename = `resum_${filterDate}.xlsx`;
-    else if (filterPlace !== "Tots els llocs") filename = `resum_${filterPlace.replace(/\s+/g,"")}.xlsx`;
-    XLSX.writeFile(workbook, filename);
-  }
+  // Scroll-based FABs
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
-  function formatFullDate(isoDateStr) {
-    const date    = new Date(isoDateStr);
-    const day     = String(date.getDate()).padStart(2, "0");
-    const month   = String(date.getMonth() + 1).padStart(2, "0");
-    const hours   = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    return `${day}/${month} ${hours}:${minutes}`;
-  }
+  // ── Scroll tracking ────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const onScroll = () => setShowScrollTop(window.scrollY > 220);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // ── Data fetching ──────────────────────────────────────────────────────────
 
   useEffect(() => {
     setLoading(true);
@@ -150,9 +143,7 @@ function OrderListPage() {
       .catch(err => { console.error(err); setError("Error carregant comandes."); setLoading(false); });
   }, [filterDate, filterPlace]);
 
-  useEffect(() => {
-    if (sortMessage) { const t = setTimeout(() => setSortMessage(""), 2000); return () => clearTimeout(t); }
-  }, [sortMessage]);
+  // ── Session & notification effects ────────────────────────────────────────
 
   useEffect(() => {
     const raw = sessionStorage.getItem("pendingMsg");
@@ -167,18 +158,75 @@ function OrderListPage() {
   }, [search, filterDate, filterPlace, sortNewestFirst]);
 
   useEffect(() => {
+    if (sortMessage) { const t = setTimeout(() => setSortMessage(""), 2000); return () => clearTimeout(t); }
+  }, [sortMessage]);
+
+  useEffect(() => {
     if (showSuccess) { const t = setTimeout(() => setShowSuccess(false), 1500); return () => clearTimeout(t); }
   }, [showSuccess]);
 
   useEffect(() => {
-    if (error) { const t = setTimeout(() => setError(""), 2000); return () => clearTimeout(t); }
+    if (error) { const t = setTimeout(() => setError(""), 2500); return () => clearTimeout(t); }
   }, [error]);
 
-  const confirmDelete = () => {
-    if (!orderToDelete) return;
-    fetch(`${import.meta.env.VITE_API_URL}/orders/${orderToDelete}`, { method: "DELETE" })
-      .then(res => { if (!res.ok) throw new Error("Error deleting"); setOrders(prev => prev.filter(o => o.id !== orderToDelete)); setOrderToDelete(null); setShowConfirm(false); })
-      .catch(err => { console.error("Delete error:", err); setError("Error eliminant la comanda."); setShowConfirm(false); });
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => { if (pickupTimerRef.current) clearTimeout(pickupTimerRef.current); };
+  }, []);
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
+  const confirmPickupNow = (orderId) => {
+    fetch(`${import.meta.env.VITE_API_URL}/orders/${orderId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "picked_up" }),
+    })
+      .then(res => { if (!res.ok) throw new Error(); return res.json(); })
+      .then(updated => setOrders(prev => prev.map(o =>
+        o.id === updated.id ? { ...o, status: "picked_up", _pendingPickup: false } : o
+      )))
+      .catch(() => {
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, _pendingPickup: false } : o));
+        setError("Error actualitzant l'estat.");
+      });
+  };
+
+  const handleMarkPickedUp = (order) => {
+    // If there's already a pending one, confirm it immediately before starting a new one
+    if (pendingPickup) {
+      clearTimeout(pickupTimerRef.current);
+      pickupTimerRef.current = null;
+      confirmPickupNow(pendingPickup.orderId);
+    }
+
+    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, _pendingPickup: true } : o));
+
+    pickupTimerRef.current = setTimeout(() => {
+      confirmPickupNow(order.id);
+      setPendingPickup(null);
+      pickupTimerRef.current = null;
+    }, 5000);
+
+    setPendingPickup({ orderId: order.id, customerName: order.customer, place: order.place, date: order.date });
+  };
+
+  const handleUndoPickup = () => {
+    clearTimeout(pickupTimerRef.current);
+    pickupTimerRef.current = null;
+    setOrders(prev => prev.map(o =>
+      o.id === pendingPickup.orderId ? { ...o, _pendingPickup: false } : o
+    ));
+    setPendingPickup(null);
+  };
+
+  const handleNewOrderSameName = () => {
+    clearTimeout(pickupTimerRef.current);
+    pickupTimerRef.current = null;
+    confirmPickupNow(pendingPickup.orderId);
+    const { customerName, place, date } = pendingPickup;
+    setPendingPickup(null);
+    navigate('/add', { state: { prefillCustomer: customerName, prefillPlace: place, prefillDate: date, returnPath: '/' } });
   };
 
   const handleStatusUpdate = (orderId, newStatus) => {
@@ -192,23 +240,21 @@ function OrderListPage() {
       .catch(() => setError("Error actualitzant l'estat."));
   };
 
-  const handleDelete = (orderId) => { setShowConfirm(true); setOrderToDelete(orderId); };
-
-  const toggleFruit = (key) => {
-    setExpandedFruits(prev => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
+  const handleDelete   = (orderId) => { setShowConfirm(true); setOrderToDelete(orderId); };
+  const confirmDelete  = () => {
+    if (!orderToDelete) return;
+    fetch(`${import.meta.env.VITE_API_URL}/orders/${orderToDelete}`, { method: "DELETE" })
+      .then(res => { if (!res.ok) throw new Error(); setOrders(prev => prev.filter(o => o.id !== orderToDelete)); setOrderToDelete(null); setShowConfirm(false); })
+      .catch(() => { setError("Error eliminant la comanda."); setShowConfirm(false); });
   };
 
-  const openSummary = () => {
-    setExpandedFruits(new Set());
-    setCopySuccess(false);
-    setShowSummary(true);
-  };
+  const toggleFruit  = (key) => setExpandedFruits(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+  const openSummary  = () => { setExpandedFruits(new Set()); setCopySuccess(false); setShowSummary(true); };
+
+  // ── Computed data ──────────────────────────────────────────────────────────
 
   const filteredOrders = orders
+    .filter(order => !order._pendingPickup)
     .filter(order => {
       const matchesName  = order.customer.toLowerCase().includes(search.toLowerCase());
       const matchesDate  = filterDate === "" || order.date === filterDate;
@@ -216,7 +262,10 @@ function OrderListPage() {
       return matchesName && matchesDate && matchesPlace;
     })
     .filter(order => !hidePicked || (order.status !== "picked_up" && order.status !== "cancelled"))
-    .sort((a, b) => sortNewestFirst ? new Date(b.created_at) - new Date(a.created_at) : new Date(a.created_at) - new Date(b.created_at));
+    .sort((a, b) => sortNewestFirst
+      ? new Date(b.created_at) - new Date(a.created_at)
+      : new Date(a.created_at) - new Date(b.created_at)
+    );
 
   const fruitSummary = {
     pressecs: {}, pressecsGrouped: {},
@@ -237,11 +286,71 @@ function OrderListPage() {
         if (!fruitSummary.pressecsGrouped[variant][size]) fruitSummary.pressecsGrouped[variant][size] = [];
         fruitSummary.pressecsGrouped[variant][size].push({ customer, qty });
       }
-      if ((fruit === "albercoc" || fruit === "cirera") && (weight === 1 || weight === 2)) fruitSummary[fruit][weight].push({ customer, qty });
+      if ((fruit === "albercoc" || fruit === "cirera") && (weight === 1 || weight === 2))
+        fruitSummary[fruit][weight].push({ customer, qty });
       if (fruit === "melo")    fruitSummary.melo.push({ customer, qty, weight });
       if (fruit === "sindria") fruitSummary.sindria.push({ customer, qty, weight });
     }
   }
+
+  const hasAnything =
+    Object.keys(fruitSummary.pressecsGrouped).length > 0 ||
+    fruitSummary.albercoc["1"].length + fruitSummary.albercoc["2"].length > 0 ||
+    fruitSummary.cirera["1"].length + fruitSummary.cirera["2"].length > 0 ||
+    fruitSummary.melo.length > 0 || fruitSummary.sindria.length > 0;
+
+  // ── Export ────────────────────────────────────────────────────────────────
+
+  function handleExport() {
+    const rows = [];
+    const customerOrders = {};
+    for (const order of filteredOrders) {
+      const customer = order.customer;
+      if (!customerOrders[customer]) customerOrders[customer] = [];
+      for (const item of order.fruits) customerOrders[customer].push(renderFruitExportLine(item));
+    }
+    for (const [customer, items] of Object.entries(customerOrders))
+      items.forEach(item => rows.push({ Client: customer, Producte: item }));
+    rows.push({});
+    rows.push({ Client: "Resum" });
+    let totalPressec = 0;
+    Object.entries(fruitSummary.pressecsGrouped).forEach(([type, sizes]) => {
+      rows.push({ Client: `Pressec ${type}` });
+      let typeTotal = 0;
+      Object.entries(sizes).forEach(([size, list]) => {
+        const subtotal = list.reduce((acc, x) => acc + x.qty, 0);
+        typeTotal += subtotal;
+        rows.push({ Client: `  ${size}`, Producte: `${subtotal} caixes` });
+      });
+      totalPressec += typeTotal;
+      rows.push({ Producte: `Total: ${typeTotal} caixes` });
+    });
+    rows.push({ Producte: `Total pressecs: ${totalPressec} caixes` });
+    ["albercoc", "cirera"].forEach(fruit => {
+      const l1 = fruitSummary[fruit]["1"], l2 = fruitSummary[fruit]["2"];
+      const c1 = l1.reduce((a, x) => a + x.qty, 0), c2 = l2.reduce((a, x) => a + x.qty, 0);
+      const kg = c1 + c2 * 2;
+      if (c1 > 0 || c2 > 0) {
+        rows.push({ Client: capitalize(fruit), Producte: `${kg} kg total` });
+        if (c1 > 0) rows.push({ Client: "  Tarrina (1kg)", Producte: `${c1} u → ${c1} kg` });
+        if (c2 > 0) rows.push({ Client: "  Caixa (2kg)",   Producte: `${c2} u → ${c2 * 2} kg` });
+      }
+    });
+    ["melo", "sindria"].forEach(fruit => {
+      const total = fruitSummary[fruit].reduce((acc, x) => acc + x.qty, 0);
+      if (total > 0) rows.push({ Client: capitalize(fruit), Producte: `${total} peces` });
+    });
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook  = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Resum");
+    let filename = "resum_fruita.xlsx";
+    if (filterDate && filterPlace !== "Tots els llocs") filename = `resum_${filterPlace.replace(/\s+/g,"")}_${filterDate}.xlsx`;
+    else if (filterDate) filename = `resum_${filterDate}.xlsx`;
+    else if (filterPlace !== "Tots els llocs") filename = `resum_${filterPlace.replace(/\s+/g,"")}.xlsx`;
+    XLSX.writeFile(workbook, filename);
+  }
+
+  // ── Summary copy text (with Kg for albercoc/cirera) ──────────────────────
 
   const getSummaryText = () => {
     const lines = [];
@@ -263,34 +372,30 @@ function OrderListPage() {
     });
 
     const ab1 = fruitSummary.albercoc["1"], ab2 = fruitSummary.albercoc["2"];
-    const abTotal = ab1.reduce((a, x) => a + x.qty, 0) + ab2.reduce((a, x) => a + x.qty, 0);
-    if (abTotal > 0) {
-      lines.push(`🟠 Albercoc — *${abTotal}*`);
-      if (ab1.length) lines.push(`  Tarrina 1kg: ${ab1.reduce((a, x) => a + x.qty, 0)}`);
-      if (ab2.length) lines.push(`  Caixa 2kg: ${ab2.reduce((a, x) => a + x.qty, 0)}`);
+    const ab1c = ab1.reduce((a, x) => a + x.qty, 0), ab2c = ab2.reduce((a, x) => a + x.qty, 0);
+    const abKg = ab1c + ab2c * 2;
+    if (abKg > 0) {
+      lines.push(`🟠 Albercoc — *${abKg} kg*`);
+      if (ab1c > 0) lines.push(`  Tarrina 1kg: ${ab1c} u (${ab1c} kg)`);
+      if (ab2c > 0) lines.push(`  Caixa 2kg: ${ab2c} u (${ab2c * 2} kg)`);
       lines.push("");
     }
 
     const ci1 = fruitSummary.cirera["1"], ci2 = fruitSummary.cirera["2"];
-    const ciTotal = ci1.reduce((a, x) => a + x.qty, 0) + ci2.reduce((a, x) => a + x.qty, 0);
-    if (ciTotal > 0) {
-      lines.push(`🍒 Cirera — *${ciTotal}*`);
-      if (ci1.length) lines.push(`  Tarrina 1kg: ${ci1.reduce((a, x) => a + x.qty, 0)}`);
-      if (ci2.length) lines.push(`  Caixa 2kg: ${ci2.reduce((a, x) => a + x.qty, 0)}`);
+    const ci1c = ci1.reduce((a, x) => a + x.qty, 0), ci2c = ci2.reduce((a, x) => a + x.qty, 0);
+    const ciKg = ci1c + ci2c * 2;
+    if (ciKg > 0) {
+      lines.push(`🍒 Cirera — *${ciKg} kg*`);
+      if (ci1c > 0) lines.push(`  Tarrina 1kg: ${ci1c} u (${ci1c} kg)`);
+      if (ci2c > 0) lines.push(`  Caixa 2kg: ${ci2c} u (${ci2c * 2} kg)`);
       lines.push("");
     }
 
     const meloTotal = fruitSummary.melo.reduce((a, x) => a + x.qty, 0);
-    if (meloTotal > 0) {
-      lines.push(`🍈 Meló — *${meloTotal} ${meloTotal === 1 ? "peça" : "peces"}*`);
-      lines.push("");
-    }
+    if (meloTotal > 0) { lines.push(`🍈 Meló — *${meloTotal} ${meloTotal === 1 ? "peça" : "peces"}*`); lines.push(""); }
 
     const sindriaTotal = fruitSummary.sindria.reduce((a, x) => a + x.qty, 0);
-    if (sindriaTotal > 0) {
-      lines.push(`🍉 Síndria — *${sindriaTotal} ${sindriaTotal === 1 ? "peça" : "peces"}*`);
-      lines.push("");
-    }
+    if (sindriaTotal > 0) { lines.push(`🍉 Síndria — *${sindriaTotal} ${sindriaTotal === 1 ? "peça" : "peces"}*`); lines.push(""); }
 
     return lines.join("\n").trimEnd();
   };
@@ -302,61 +407,84 @@ function OrderListPage() {
     });
   };
 
-  const hasAnything =
-    Object.keys(fruitSummary.pressecsGrouped).length > 0 ||
-    fruitSummary.albercoc["1"].length + fruitSummary.albercoc["2"].length > 0 ||
-    fruitSummary.cirera["1"].length + fruitSummary.cirera["2"].length > 0 ||
-    fruitSummary.melo.length > 0 || fruitSummary.sindria.length > 0;
+  // ── getDateLabel (for filter button) ─────────────────────────────────────
+
+  function getDateLabel(dateStr) {
+    const t  = getTodayMadrid();
+    const tm = addDays(t, 1);
+    const yd = addDays(t, -1);
+    const [y, m, d] = dateStr.split('-');
+    const date = new Date(dateStr + 'T00:00:00');
+    const diaSemana = DIES[date.getDay()];
+    const dia = parseInt(d);
+    const mes = MESOS[parseInt(m) - 1];
+    const yearSuffix = parseInt(y) < CURRENT_YEAR ? ` ${y}` : '';
+    if (dateStr === t)  return `Avui · ${diaSemana} ${dia} ${mes}${yearSuffix}`;
+    if (dateStr === tm) return `Demà · ${diaSemana} ${dia} ${mes}${yearSuffix}`;
+    if (dateStr === yd) return `Ahir · ${diaSemana} ${dia} ${mes}${yearSuffix}`;
+    return `${diaSemana} ${dia} ${mes}${yearSuffix}`;
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <>
+      {/* ── Notification toasts ── */}
       <AnimatePresence>
         {showSuccess && (
           <motion.div key="success" initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}
-            className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+            className="fixed inset-0 flex items-center justify-center z-[60] pointer-events-none">
             <div className="popup-message success">{successMessage}</div>
           </motion.div>
         )}
         {error && (
           <motion.div key="error" initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}
-            className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+            className="fixed inset-0 flex items-center justify-center z-[60] pointer-events-none">
             <div className="popup-message error">{error}</div>
           </motion.div>
         )}
         {sortMessage && (
           <motion.div key="sort" initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}
-            className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+            className="fixed inset-0 flex items-center justify-center z-[60] pointer-events-none">
             <div className="popup-message info">{sortMessage}</div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="min-h-screen" style={{ backgroundColor: "#FAFAF5" }}>
-        <div className="max-w-md mx-auto px-4 pt-6 pb-10">
-
-          <div className="flex justify-center mb-6">
-            <img src="/logopressec1.png" alt="Logo" className="h-16 w-16 object-contain" />
+      {/* ── Fixed top navbar ── */}
+      <nav className="fixed top-0 inset-x-0 z-50 bg-white border-b border-stone-100 shadow-sm">
+        <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
+          <img src="/logopressec1.png" alt="Logo" className="h-9 w-9 object-contain" />
+          <div className="flex items-center">
+            <button
+              onClick={openSummary}
+              className="p-2.5 rounded-xl hover:bg-stone-50 transition-colors"
+              title="Resum">
+              <Package className="w-5 h-5" style={{ color: "#F59E0B" }} />
+            </button>
+            <button
+              onClick={handleExport}
+              className="p-2.5 rounded-xl hover:bg-stone-50 transition-colors"
+              title="Exportar">
+              <Sheet className="w-5 h-5 text-emerald-500" />
+            </button>
+            <button
+              onClick={() => navigate("/picking")}
+              className="p-2.5 rounded-xl hover:bg-stone-50 transition-colors"
+              title="Llista de Recollida">
+              <ClipboardList className="w-5 h-5 text-stone-500" />
+            </button>
           </div>
+        </div>
+      </nav>
 
-          <button
-            onClick={() => navigate("/add", { state: { prefillDate: addDays(today, 7), returnPath: "/" } })}
-            className="w-full py-3 rounded-xl mb-2 flex items-center justify-center font-semibold text-white shadow-md transition-all active:scale-95"
-            style={{ backgroundColor: "#F59E0B" }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = "#D97706"}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = "#F59E0B"}
-          >
-            <Plus className="w-5 h-5 mr-2" /> Afegir Comanda
-          </button>
+      {/* ── Main content ── */}
+      <div className="min-h-screen pt-14" style={{ backgroundColor: "#FAFAF5" }}>
+        <div className="max-w-md mx-auto px-4 pt-3 pb-28">
 
-          <button
-            onClick={() => navigate("/picking")}
-            className="w-full py-2.5 rounded-xl mb-4 flex items-center justify-center font-semibold text-stone-700 bg-white border border-stone-200 shadow-sm hover:bg-stone-50 transition-all active:scale-95 gap-2 text-sm"
-          >
-            <ClipboardList className="w-4 h-4 text-stone-500" />
-            Llista de Recollida
-          </button>
-
-          <div className="mb-3">
+          {/* ── Filter section (non-sticky, gray bg) ── */}
+          <div className="bg-gray-50 rounded-2xl p-3 mb-4 border border-stone-100 space-y-2">
+            {/* Search */}
             <input
               type="text"
               placeholder="Busca un client..."
@@ -367,78 +495,76 @@ function OrderListPage() {
               onFocus={e => e.target.style.borderColor = "#F59E0B"}
               onBlur={e => e.target.style.borderColor = "#E7E5E4"}
             />
-          </div>
 
-          <div className="flex items-center gap-1.5 mb-3">
-            <button onClick={() => setFilterDate(prev => addDays(prev || today, -1))}
-              className="p-2.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 shadow-sm text-stone-600 leading-none text-lg font-medium transition-colors flex-shrink-0">
-              &lsaquo;
-            </button>
-            <div className="flex-1 relative">
+            {/* Date picker */}
+            <div className="flex items-center gap-1.5">
               <button
-                onClick={() => document.getElementById("date-picker").showPicker?.()}
-                className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-xl shadow-sm text-sm font-semibold text-stone-700 text-center hover:bg-stone-50 transition-colors">
-                {filterDate ? getDateLabel(filterDate) : "Totes les dates"}
+                onClick={() => setFilterDate(prev => addDays(prev || today, -1))}
+                className="p-2.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 shadow-sm text-stone-600 leading-none text-lg font-medium transition-colors flex-shrink-0">
+                &lsaquo;
               </button>
-              <input
-                id="date-picker"
-                type="date"
-                value={filterDate}
-                onChange={e => setFilterDate(e.target.value)}
-                className="absolute opacity-0 pointer-events-none"
-                style={{ top: 0, left: 0, width: "1px", height: "1px" }}
-              />
+              <div className="flex-1 relative">
+                <button
+                  onClick={() => document.getElementById("date-picker").showPicker?.()}
+                  className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-xl shadow-sm text-sm font-semibold text-stone-700 text-center hover:bg-stone-50 transition-colors">
+                  {filterDate ? getDateLabel(filterDate) : "Totes les dates"}
+                </button>
+                <input
+                  id="date-picker"
+                  type="date"
+                  value={filterDate}
+                  onChange={e => setFilterDate(e.target.value)}
+                  className="absolute opacity-0 pointer-events-none"
+                  style={{ top: 0, left: 0, width: "1px", height: "1px" }}
+                />
+              </div>
+              <button
+                onClick={() => setFilterDate(prev => addDays(prev || today, 1))}
+                className="p-2.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 shadow-sm text-stone-600 leading-none text-lg font-medium transition-colors flex-shrink-0">
+                &rsaquo;
+              </button>
             </div>
-            <button onClick={() => setFilterDate(prev => addDays(prev || today, 1))}
-              className="p-2.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 shadow-sm text-stone-600 leading-none text-lg font-medium transition-colors flex-shrink-0">
-              &rsaquo;
-            </button>
-          </div>
 
-          <div className="flex gap-1.5 overflow-x-auto pb-1 mb-3" style={{ scrollbarWidth: "none" }}>
-            {["Tots els llocs", ...PLACES].map(place => (
+            {/* Place chips */}
+            <div className="flex gap-1.5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+              {["Tots els llocs", ...PLACES].map(place => (
+                <button
+                  key={place}
+                  onClick={() => setFilterPlace(place)}
+                  className="px-3 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap border transition-all flex-shrink-0"
+                  style={filterPlace === place
+                    ? { backgroundColor: "#F59E0B", borderColor: "#F59E0B", color: "#1C1917" }
+                    : { backgroundColor: "white", borderColor: "#E7E5E4", color: "#57534E" }
+                  }
+                >
+                  {place === "Tots els llocs" ? "Tots" : place}
+                </button>
+              ))}
+            </div>
+
+            {/* Sort + hide toggles */}
+            <div className="flex gap-2 justify-end">
               <button
-                key={place}
-                onClick={() => setFilterPlace(place)}
-                className="px-3 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap border transition-all flex-shrink-0"
-                style={filterPlace === place
-                  ? { backgroundColor: "#F59E0B", borderColor: "#F59E0B", color: "#1C1917" }
-                  : { backgroundColor: "white", borderColor: "#E7E5E4", color: "#57534E" }
-                }
-              >
-                {place === "Tots els llocs" ? "Tots" : place}
+                onClick={() => { setSortNewestFirst(prev => !prev); setSortMessage(sortNewestFirst ? "Mes antics primer" : "Mes nous primer"); }}
+                className="bg-white border border-stone-200 text-stone-600 px-3 py-2 rounded-xl flex items-center shadow-sm hover:bg-stone-50 transition-colors"
+                title="Canviar ordre">
+                {sortNewestFirst ? <ClockArrowDown className="w-4 h-4" /> : <ClockArrowUp className="w-4 h-4" />}
               </button>
-            ))}
+              <button
+                onClick={() => setHidePicked(prev => !prev)}
+                className="px-3 py-2 rounded-xl border text-xs font-semibold shadow-sm transition-colors"
+                style={hidePicked
+                  ? { backgroundColor: "#F59E0B", borderColor: "#F59E0B", color: "#1c1917" }
+                  : { backgroundColor: "white", borderColor: "#E7E5E4", color: "#78716C" }
+                }
+                title={hidePicked ? "Mostrar totes" : "Amagar recollides"}
+              >
+                {hidePicked ? "Pendents" : "Totes"}
+              </button>
+            </div>
           </div>
 
-          <div className="flex gap-2 mb-5">
-            <button onClick={openSummary}
-              className="flex-1 bg-white border border-stone-200 text-stone-700 px-3 py-2.5 rounded-xl flex items-center justify-center shadow-sm hover:bg-stone-50 text-sm font-medium transition-colors gap-1.5">
-              <Package className="w-4 h-4" style={{ color: "#F59E0B" }} /> Resum
-            </button>
-            <button onClick={handleExport}
-              className="flex-1 bg-white border border-stone-200 text-stone-700 px-3 py-2.5 rounded-xl flex items-center justify-center shadow-sm hover:bg-stone-50 text-sm font-medium transition-colors gap-1.5">
-              <Sheet className="w-4 h-4 text-emerald-500" /> Exportar
-            </button>
-            <button
-              onClick={() => { setSortNewestFirst(prev => !prev); setSortMessage(sortNewestFirst ? "Mes antics primer" : "Mes nous primer"); }}
-              className="bg-white border border-stone-200 text-stone-600 px-3 py-2.5 rounded-xl flex items-center shadow-sm hover:bg-stone-50 transition-colors"
-              title="Canviar ordre">
-              {sortNewestFirst ? <ClockArrowDown className="w-4 h-4" /> : <ClockArrowUp className="w-4 h-4" />}
-            </button>
-            <button
-              onClick={() => setHidePicked(prev => !prev)}
-              className="px-3 py-2.5 rounded-xl border text-xs font-semibold shadow-sm transition-colors"
-              style={hidePicked
-                ? { backgroundColor: "#F59E0B", borderColor: "#F59E0B", color: "#1c1917" }
-                : { backgroundColor: "white", borderColor: "#E7E5E4", color: "#78716C" }
-              }
-              title={hidePicked ? "Mostrar totes" : "Amagar recollides"}
-            >
-              {hidePicked ? "Pendents" : "Totes"}
-            </button>
-          </div>
-
+          {/* ── Order list ── */}
           {loading ? (
             <div className="flex flex-col items-center justify-center mt-20">
               <div className="w-10 h-10 border-4 border-amber-100 border-t-amber-400 rounded-full animate-spin mb-3"></div>
@@ -500,7 +626,10 @@ function OrderListPage() {
                           const nextCfg = STATUS_CONFIG[s.next];
                           return (
                             <button
-                              onClick={() => handleStatusUpdate(order.id, s.next)}
+                              onClick={() => s.next === 'picked_up'
+                                ? handleMarkPickedUp(order)
+                                : handleStatusUpdate(order.id, s.next)
+                              }
                               className="flex-1 px-3 py-2 rounded-xl text-xs font-semibold border transition-colors"
                               style={{ backgroundColor: nextCfg.bg, color: nextCfg.color, borderColor: nextCfg.color + "40" }}
                             >
@@ -529,7 +658,7 @@ function OrderListPage() {
             </motion.div>
           )}
 
-          {/* ── Delete confirm ── */}
+          {/* ── Delete confirm modal ── */}
           <AnimatePresence>
             {showConfirm && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -581,24 +710,18 @@ function OrderListPage() {
               className="fixed bottom-0 inset-x-0 z-50 bg-white rounded-t-3xl flex flex-col shadow-2xl"
               style={{ maxHeight: "88vh" }}
             >
-              {/* Drag handle */}
               <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
                 <div className="w-10 h-1 rounded-full bg-stone-200" />
               </div>
-
-              {/* Header */}
               <div className="flex items-center justify-between px-5 py-2 flex-shrink-0">
                 <h2 className="text-lg font-bold text-stone-900 flex items-center gap-2">
-                  <Package className="w-5 h-5" style={{ color: "#F59E0B" }} />
-                  Resum
+                  <Package className="w-5 h-5" style={{ color: "#F59E0B" }} /> Resum
                 </h2>
                 <button onClick={() => setShowSummary(false)}
                   className="w-8 h-8 flex items-center justify-center rounded-full text-stone-400 hover:bg-stone-100 text-xl transition-colors">
                   &times;
                 </button>
               </div>
-
-              {/* Context banner */}
               {(filterPlace !== "Tots els llocs" || filterDate) && (
                 <div className="mx-4 mb-2 px-4 py-2.5 rounded-xl flex-shrink-0"
                   style={{ backgroundColor: "#FFFBEB", border: "1px solid #FDE68A" }}>
@@ -611,9 +734,7 @@ function OrderListPage() {
                 </div>
               )}
 
-              {/* Scrollable fruit cards */}
               <div className="overflow-y-auto flex-1 px-4 pb-3 space-y-2.5">
-
                 {/* Pressec */}
                 {Object.entries(fruitSummary.pressecsGrouped).map(([variant, sizes]) => {
                   const total = Object.values(sizes).flat().reduce((a, x) => a + x.qty, 0);
@@ -658,42 +779,43 @@ function OrderListPage() {
                   );
                 })}
 
-                {/* Albercoc */}
+                {/* Albercoc — mostra Kg totals */}
                 {(() => {
                   const l1 = fruitSummary.albercoc["1"], l2 = fruitSummary.albercoc["2"];
-                  const total = l1.reduce((a, x) => a + x.qty, 0) + l2.reduce((a, x) => a + x.qty, 0);
-                  if (total === 0) return null;
+                  const c1 = l1.reduce((a, x) => a + x.qty, 0), c2 = l2.reduce((a, x) => a + x.qty, 0);
+                  const totalKg = c1 + c2 * 2;
+                  if (totalKg === 0) return null;
                   const key = "albercoc"; const isExp = expandedFruits.has(key); const st = FRUIT_CARD_STYLE.albercoc;
                   return (
                     <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${st.border}` }}>
                       <button onClick={() => toggleFruit(key)} className="w-full flex items-center gap-3 px-4 py-4 text-left" style={{ backgroundColor: st.bg }}>
                         <span className="text-xl flex-shrink-0">🟠</span>
                         <span className="flex-1 font-bold text-stone-900">Albercoc</span>
-                        <span className="text-4xl font-black leading-none tabular-nums" style={{ color: st.numColor }}>{total}</span>
-                        <span className="w-9" />
+                        <span className="text-4xl font-black leading-none tabular-nums" style={{ color: st.numColor }}>{totalKg}</span>
+                        <span className="text-xs text-stone-500 w-9 text-left">kg</span>
                         <ChevronDown className={`w-4 h-4 text-stone-400 flex-shrink-0 transition-transform ${isExp ? "rotate-180" : ""}`} />
                       </button>
                       {isExp && (
                         <div className="bg-white px-4 py-3 border-t space-y-3" style={{ borderColor: st.border }}>
-                          {l1.length > 0 && (
+                          {c1 > 0 && (
                             <div>
                               <div className="flex items-center justify-between mb-1.5">
                                 <span className="text-sm font-semibold text-stone-700">Tarrina (1 kg)</span>
-                                <span className="text-sm font-bold" style={{ color: st.numColor }}>{l1.reduce((a, x) => a + x.qty, 0)}</span>
+                                <span className="text-sm font-bold" style={{ color: st.numColor }}>{c1} u · {c1} kg</span>
                               </div>
                               <div className="space-y-1 pl-2">
-                                {l1.map((e, i) => <div key={i} className="flex items-center justify-between text-xs text-stone-500"><span>{e.customer}</span><span className="font-medium">{e.qty}</span></div>)}
+                                {l1.map((e, i) => <div key={i} className="flex items-center justify-between text-xs text-stone-500"><span>{e.customer}</span><span className="font-medium">{e.qty} u</span></div>)}
                               </div>
                             </div>
                           )}
-                          {l2.length > 0 && (
+                          {c2 > 0 && (
                             <div>
                               <div className="flex items-center justify-between mb-1.5">
                                 <span className="text-sm font-semibold text-stone-700">Caixa (2 kg)</span>
-                                <span className="text-sm font-bold" style={{ color: st.numColor }}>{l2.reduce((a, x) => a + x.qty, 0)}</span>
+                                <span className="text-sm font-bold" style={{ color: st.numColor }}>{c2} u · {c2 * 2} kg</span>
                               </div>
                               <div className="space-y-1 pl-2">
-                                {l2.map((e, i) => <div key={i} className="flex items-center justify-between text-xs text-stone-500"><span>{e.customer}</span><span className="font-medium">{e.qty}</span></div>)}
+                                {l2.map((e, i) => <div key={i} className="flex items-center justify-between text-xs text-stone-500"><span>{e.customer}</span><span className="font-medium">{e.qty} u</span></div>)}
                               </div>
                             </div>
                           )}
@@ -703,42 +825,43 @@ function OrderListPage() {
                   );
                 })()}
 
-                {/* Cirera */}
+                {/* Cirera — mostra Kg totals */}
                 {(() => {
                   const l1 = fruitSummary.cirera["1"], l2 = fruitSummary.cirera["2"];
-                  const total = l1.reduce((a, x) => a + x.qty, 0) + l2.reduce((a, x) => a + x.qty, 0);
-                  if (total === 0) return null;
+                  const c1 = l1.reduce((a, x) => a + x.qty, 0), c2 = l2.reduce((a, x) => a + x.qty, 0);
+                  const totalKg = c1 + c2 * 2;
+                  if (totalKg === 0) return null;
                   const key = "cirera"; const isExp = expandedFruits.has(key); const st = FRUIT_CARD_STYLE.cirera;
                   return (
                     <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${st.border}` }}>
                       <button onClick={() => toggleFruit(key)} className="w-full flex items-center gap-3 px-4 py-4 text-left" style={{ backgroundColor: st.bg }}>
                         <span className="text-xl flex-shrink-0">🍒</span>
                         <span className="flex-1 font-bold text-stone-900">Cirera</span>
-                        <span className="text-4xl font-black leading-none tabular-nums" style={{ color: st.numColor }}>{total}</span>
-                        <span className="w-9" />
+                        <span className="text-4xl font-black leading-none tabular-nums" style={{ color: st.numColor }}>{totalKg}</span>
+                        <span className="text-xs text-stone-500 w-9 text-left">kg</span>
                         <ChevronDown className={`w-4 h-4 text-stone-400 flex-shrink-0 transition-transform ${isExp ? "rotate-180" : ""}`} />
                       </button>
                       {isExp && (
                         <div className="bg-white px-4 py-3 border-t space-y-3" style={{ borderColor: st.border }}>
-                          {l1.length > 0 && (
+                          {c1 > 0 && (
                             <div>
                               <div className="flex items-center justify-between mb-1.5">
                                 <span className="text-sm font-semibold text-stone-700">Tarrina (1 kg)</span>
-                                <span className="text-sm font-bold" style={{ color: st.numColor }}>{l1.reduce((a, x) => a + x.qty, 0)}</span>
+                                <span className="text-sm font-bold" style={{ color: st.numColor }}>{c1} u · {c1} kg</span>
                               </div>
                               <div className="space-y-1 pl-2">
-                                {l1.map((e, i) => <div key={i} className="flex items-center justify-between text-xs text-stone-500"><span>{e.customer}</span><span className="font-medium">{e.qty}</span></div>)}
+                                {l1.map((e, i) => <div key={i} className="flex items-center justify-between text-xs text-stone-500"><span>{e.customer}</span><span className="font-medium">{e.qty} u</span></div>)}
                               </div>
                             </div>
                           )}
-                          {l2.length > 0 && (
+                          {c2 > 0 && (
                             <div>
                               <div className="flex items-center justify-between mb-1.5">
                                 <span className="text-sm font-semibold text-stone-700">Caixa (2 kg)</span>
-                                <span className="text-sm font-bold" style={{ color: st.numColor }}>{l2.reduce((a, x) => a + x.qty, 0)}</span>
+                                <span className="text-sm font-bold" style={{ color: st.numColor }}>{c2} u · {c2 * 2} kg</span>
                               </div>
                               <div className="space-y-1 pl-2">
-                                {l2.map((e, i) => <div key={i} className="flex items-center justify-between text-xs text-stone-500"><span>{e.customer}</span><span className="font-medium">{e.qty}</span></div>)}
+                                {l2.map((e, i) => <div key={i} className="flex items-center justify-between text-xs text-stone-500"><span>{e.customer}</span><span className="font-medium">{e.qty} u</span></div>)}
                               </div>
                             </div>
                           )}
@@ -814,7 +937,6 @@ function OrderListPage() {
                 )}
               </div>
 
-              {/* Copy button */}
               <div className="px-4 py-4 border-t border-stone-100 flex-shrink-0">
                 <button
                   onClick={handleCopy}
@@ -832,9 +954,85 @@ function OrderListPage() {
           </>
         )}
       </AnimatePresence>
+
+      {/* ── Pickup undo toast (mini bottom sheet) ── */}
+      <AnimatePresence>
+        {pendingPickup && (
+          <motion.div
+            key="pickup-toast"
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", stiffness: 300, damping: 32 }}
+            className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-2xl shadow-2xl overflow-hidden"
+          >
+            {/* Progress bar countdown */}
+            <div className="relative h-1.5 bg-stone-100 w-full">
+              <motion.div
+                key={pendingPickup.orderId}
+                className="absolute inset-0 bg-emerald-400"
+                style={{ transformOrigin: "left" }}
+                initial={{ scaleX: 1 }}
+                animate={{ scaleX: 0 }}
+                transition={{ duration: 5, ease: "linear" }}
+              />
+            </div>
+            {/* Content */}
+            <div className="px-5 pt-4 pb-8">
+              <div className="flex items-center gap-2 mb-0.5">
+                <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                <span className="font-bold text-stone-900">Marcat com a recollit</span>
+              </div>
+              <p className="text-sm text-stone-500 mb-4 ml-6">{pendingPickup.customerName}</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleUndoPickup}
+                  className="flex-1 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold text-sm flex items-center justify-center gap-1.5 transition-colors">
+                  <RotateCcw className="w-4 h-4" /> Desfer
+                </button>
+                <button
+                  onClick={handleNewOrderSameName}
+                  className="flex-1 py-2.5 rounded-xl text-stone-900 font-semibold text-sm flex items-center justify-center gap-1.5 transition-colors"
+                  style={{ backgroundColor: "#F59E0B" }}>
+                  <Plus className="w-4 h-4" /> Nova comanda
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── FAB: scroll to top ── */}
+      <AnimatePresence>
+        {showScrollTop && !pendingPickup && (
+          <motion.button
+            key="fab-up"
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 22 }}
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="fixed bottom-20 right-4 w-11 h-11 rounded-full bg-white border border-stone-200 shadow-lg text-stone-600 flex items-center justify-center z-30 active:scale-95"
+          >
+            <ArrowUp className="w-4 h-4" />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* ── FAB: add order ── */}
+      <button
+        onClick={() => navigate("/add", { state: { prefillDate: addDays(today, 7), returnPath: "/" } })}
+        className="fixed bottom-4 right-4 w-14 h-14 rounded-full text-white shadow-xl flex items-center justify-center z-30 transition-all active:scale-95 hover:brightness-110"
+        style={{ backgroundColor: "#F59E0B" }}
+        title="Afegir comanda"
+      >
+        <Plus className="w-7 h-7" />
+      </button>
     </>
   );
 }
+
+// ── Fruit detail renderer (for order cards) ──────────────────────────────────
 
 function renderFruitDetails(item) {
   if (item.fruit.startsWith("pressec_")) {
@@ -853,15 +1051,6 @@ function renderFruitDetails(item) {
   if (item.fruit === "melo")    return `Melo: ${item.qty} peces${item.weight ? ` - ${item.weight} kg` : ""}`;
   if (item.fruit === "sindria") return `Sindria: ${item.qty} peces${item.weight ? ` - ${item.weight} kg` : ""}`;
   return `${capitalize(item.fruit)}: ${item.qty}`;
-}
-
-function formatDate(dateStr) {
-  const [, mm, dd] = dateStr.split("-");
-  return `${dd}/${mm}`;
-}
-
-function capitalize(str) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 export default OrderListPage;

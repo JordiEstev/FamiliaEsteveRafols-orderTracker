@@ -67,10 +67,12 @@ export default function AddOrderWizard() {
   const prefill    = location.state || {};
   const returnPath = prefill.returnPath ?? "/";
 
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(
+    prefill.prefillCustomer && prefill.prefillCustomer.trim().length >= 2 ? 2 : 1
+  );
   const [dir,  setDir]  = useState(1);
   const [order, setOrder] = useState({
-    customer: "",
+    customer: prefill.prefillCustomer || "",
     place:    prefill.prefillPlace || "",
     date:     prefill.prefillDate  || "",
     fruits:   [],
@@ -292,6 +294,12 @@ export default function AddOrderWizard() {
               <span className="font-semibold text-stone-300">{STEP_LABELS[step - 1]}</span>
             </p>
           </div>
+          <button
+            onClick={() => navigate(returnPath)}
+            className="text-stone-500 hover:text-stone-300 text-sm font-medium transition-colors flex-shrink-0 px-1"
+          >
+            Cancel·lar
+          </button>
         </div>
       </div>
 
