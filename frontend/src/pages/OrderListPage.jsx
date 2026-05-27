@@ -275,7 +275,7 @@ function getDateLabel(dateStr) {
           </div>
 
           <div className="flex items-center gap-1.5 mb-3">
-            <button onClick={() => setFilterDate(prev => prev ? addDays(prev, -1) : today)}
+            <button onClick={() => setFilterDate(prev => addDays(prev || today, -1))}
               className="p-2.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 shadow-sm text-stone-600 leading-none text-lg font-medium transition-colors flex-shrink-0">
               &lsaquo;
             </button>
@@ -294,7 +294,7 @@ function getDateLabel(dateStr) {
                 style={{ top: 0, left: 0, width: "1px", height: "1px" }}
               />
             </div>
-            <button onClick={() => setFilterDate(prev => prev ? addDays(prev, 1) : today)}
+            <button onClick={() => setFilterDate(prev => addDays(prev || today, 1))}
               className="p-2.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 shadow-sm text-stone-600 leading-none text-lg font-medium transition-colors flex-shrink-0">
               &rsaquo;
             </button>
