@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Package, Pencil, Trash2, Sheet, ClockArrowDown, ClockArrowUp, ClipboardList } from "lucide-react";
+import { Plus, Package, Pencil, Trash2, Sheet, ClockArrowDown, ClockArrowUp, ClipboardList, ChevronDown, Copy, Check } from "lucide-react";
 import * as XLSX from 'xlsx';
 import './OrderListPage.css';
 import { motion, AnimatePresence } from "framer-motion";
 import { renderFruitExportLine, PLACES } from "../utils/fruit";
+
+const DIES  = ["Diumenge","Dilluns","Dimarts","Dimecres","Dijous","Divendres","Dissabte"];
+const MESOS = ["Gener","Febrer","Març","Abril","Maig","Juny","Juliol","Agost","Setembre","Octubre","Novembre","Desembre"];
 
 const STATUS_CONFIG = {
   pending:   { color: "#F59E0B", bg: "#FFFBEB", label: "Pendent",    next: "ready" },
@@ -12,6 +15,21 @@ const STATUS_CONFIG = {
   picked_up: { color: "#10B981", bg: "#ECFDF5", label: "Recollit",   next: null },
   cancelled: { color: "#78716C", bg: "#F5F5F4", label: "Cancel·lat", next: null },
 };
+
+const FRUIT_CARD_STYLE = {
+  pressec:  { bg: "#FFF7ED", border: "#FED7AA", numColor: "#D97706" },
+  albercoc: { bg: "#FEFCE8", border: "#FEF08A", numColor: "#CA8A04" },
+  cirera:   { bg: "#FFF1F2", border: "#FECDD3", numColor: "#BE123C" },
+  melo:     { bg: "#F0FDF4", border: "#BBF7D0", numColor: "#15803D" },
+  sindria:  { bg: "#FFF1F2", border: "#FECDD3", numColor: "#E11D48" },
+};
+
+function getDateLabelFull(dateStr) {
+  if (!dateStr) return "";
+  const [, m, d] = dateStr.split("-");
+  const date = new Date(dateStr + "T00:00:00");
+  return `${DIES[date.getDay()]} ${parseInt(d)} de ${MESOS[parseInt(m) - 1].toLowerCase()}`;
+}
 
 function OrderListPage() {
   const navigate = useNavigate();
@@ -38,26 +56,23 @@ function OrderListPage() {
   });
   const [sortMessage, setSortMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const [expandedFruits, setExpandedFruits] = useState(new Set());
+  const [copySuccess, setCopySuccess] = useState(false);
 
-const DIES = ["Diumenge", "Dilluns", "Dimarts", "Dimecres", "Dijous", "Divendres", "Dissabte"];
-const MESOS = ["Gener", "Febrer", "Març", "Abril", "Maig", "Juny", "Juliol", "Agost", "Setembre", "Octubre", "Novembre", "Desembre"];
-
-function getDateLabel(dateStr) {
-  const today = new Date().toISOString().split('T')[0];
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-  
-  const [y, m, d] = dateStr.split('-');
-  const date = new Date(dateStr);
-  const diaSemana = DIES[date.getDay()];
-  const dia = parseInt(d);
-  const mes = MESOS[parseInt(m) - 1];
-
-  if (dateStr === today) return `Avui · ${diaSemana} ${dia} ${mes}`;
-  if (dateStr === tomorrow) return `Demà · ${diaSemana} ${dia} ${mes}`;
-  if (dateStr === yesterday) return `Ahir · ${diaSemana} ${dia} ${mes}`;
-  return `${diaSemana} ${dia} ${mes}`;
-}
+  function getDateLabel(dateStr) {
+    const t  = new Date().toISOString().split('T')[0];
+    const tm = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+    const yd = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const [, m, d] = dateStr.split('-');
+    const date = new Date(dateStr);
+    const diaSemana = DIES[date.getDay()];
+    const dia = parseInt(d);
+    const mes = MESOS[parseInt(m) - 1];
+    if (dateStr === t)  return `Avui · ${diaSemana} ${dia} ${mes}`;
+    if (dateStr === tm) return `Demà · ${diaSemana} ${dia} ${mes}`;
+    if (dateStr === yd) return `Ahir · ${diaSemana} ${dia} ${mes}`;
+    return `${diaSemana} ${dia} ${mes}`;
+  }
 
   function addDays(dateStr, n) {
     const d = new Date(dateStr);
@@ -97,8 +112,8 @@ function getDateLabel(dateStr) {
       const l1 = fruitSummary[fruit]["1"], l2 = fruitSummary[fruit]["2"];
       if (l1.length > 0 || l2.length > 0) {
         rows.push({ Client: capitalize(fruit) });
-        if (l1.length > 0) rows.push({ Client: "  Tarrina (1kg)", Producte: `${l1.reduce((a,x)=>a+x.qty,0)}` });
-        if (l2.length > 0) rows.push({ Client: "  Caixa (2kg)", Producte: `${l2.reduce((a,x)=>a+x.qty,0)}` });
+        if (l1.length > 0) rows.push({ Client: "  Tarrina (1kg)", Producte: `${l1.reduce((a, x) => a + x.qty, 0)}` });
+        if (l2.length > 0) rows.push({ Client: "  Caixa (2kg)",   Producte: `${l2.reduce((a, x) => a + x.qty, 0)}` });
       }
     });
     ["melo", "sindria"].forEach(fruit => {
@@ -106,7 +121,7 @@ function getDateLabel(dateStr) {
       if (total > 0) rows.push({ Client: capitalize(fruit), Producte: `${total} peces` });
     });
     const worksheet = XLSX.utils.json_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
+    const workbook  = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Resum");
     let filename = "resum_fruita.xlsx";
     if (filterDate && filterPlace !== "Tots els llocs") filename = `resum_${filterPlace.replace(/\s+/g,"")}_${filterDate}.xlsx`;
@@ -116,10 +131,10 @@ function getDateLabel(dateStr) {
   }
 
   function formatFullDate(isoDateStr) {
-    const date = new Date(isoDateStr);
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const hours = String(date.getHours()).padStart(2, "0");
+    const date    = new Date(isoDateStr);
+    const day     = String(date.getDate()).padStart(2, "0");
+    const month   = String(date.getMonth() + 1).padStart(2, "0");
+    const hours   = String(date.getHours()).padStart(2, "0");
     const minutes = String(date.getMinutes()).padStart(2, "0");
     return `${day}/${month} ${hours}:${minutes}`;
   }
@@ -142,11 +157,7 @@ function getDateLabel(dateStr) {
   useEffect(() => {
     const raw = sessionStorage.getItem("pendingMsg");
     if (raw) {
-      try {
-        const { text } = JSON.parse(raw);
-        setSuccessMessage(text);
-        setShowSuccess(true);
-      } catch {}
+      try { const { text } = JSON.parse(raw); setSuccessMessage(text); setShowSuccess(true); } catch {}
       sessionStorage.removeItem("pendingMsg");
     }
   }, []);
@@ -183,17 +194,36 @@ function getDateLabel(dateStr) {
 
   const handleDelete = (orderId) => { setShowConfirm(true); setOrderToDelete(orderId); };
 
+  const toggleFruit = (key) => {
+    setExpandedFruits(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
+  const openSummary = () => {
+    setExpandedFruits(new Set());
+    setCopySuccess(false);
+    setShowSummary(true);
+  };
+
   const filteredOrders = orders
     .filter(order => {
-      const matchesName = order.customer.toLowerCase().includes(search.toLowerCase());
-      const matchesDate = filterDate === "" || order.date === filterDate;
+      const matchesName  = order.customer.toLowerCase().includes(search.toLowerCase());
+      const matchesDate  = filterDate === "" || order.date === filterDate;
       const matchesPlace = filterPlace === "Tots els llocs" || order.place === filterPlace;
       return matchesName && matchesDate && matchesPlace;
     })
     .filter(order => !hidePicked || (order.status !== "picked_up" && order.status !== "cancelled"))
     .sort((a, b) => sortNewestFirst ? new Date(b.created_at) - new Date(a.created_at) : new Date(a.created_at) - new Date(b.created_at));
 
-  const fruitSummary = { pressecs: {}, pressecsGrouped: {}, albercoc: { "1": [], "2": [] }, cirera: { "1": [], "2": [] }, melo: [], sindria: [] };
+  const fruitSummary = {
+    pressecs: {}, pressecsGrouped: {},
+    albercoc: { "1": [], "2": [] },
+    cirera:   { "1": [], "2": [] },
+    melo: [], sindria: [],
+  };
   for (const order of filteredOrders) {
     for (const item of order.fruits) {
       const { fruit, size, qty, weight } = item;
@@ -208,10 +238,75 @@ function getDateLabel(dateStr) {
         fruitSummary.pressecsGrouped[variant][size].push({ customer, qty });
       }
       if ((fruit === "albercoc" || fruit === "cirera") && (weight === 1 || weight === 2)) fruitSummary[fruit][weight].push({ customer, qty });
-      if (fruit === "melo") fruitSummary.melo.push({ customer, qty });
-      if (fruit === "sindria") fruitSummary.sindria.push({ customer, qty });
+      if (fruit === "melo")    fruitSummary.melo.push({ customer, qty, weight });
+      if (fruit === "sindria") fruitSummary.sindria.push({ customer, qty, weight });
     }
   }
+
+  const getSummaryText = () => {
+    const lines = [];
+    const ctx = [
+      filterPlace !== "Tots els llocs" ? filterPlace : null,
+      filterDate ? getDateLabelFull(filterDate) : null,
+    ].filter(Boolean).join(" · ");
+    lines.push(`*Resum${ctx ? ` — ${ctx}` : ""}*`);
+    lines.push("");
+
+    Object.entries(fruitSummary.pressecsGrouped).forEach(([variant, sizes]) => {
+      const total = Object.values(sizes).flat().reduce((a, x) => a + x.qty, 0);
+      lines.push(`🍑 Pressec ${variant} — *${total} ${total === 1 ? "caixa" : "caixes"}*`);
+      Object.entries(sizes).sort(([a], [b]) => parseInt(a) - parseInt(b)).forEach(([size, list]) => {
+        const sub = list.reduce((a, x) => a + x.qty, 0);
+        lines.push(`  Cal.${size}: ${sub} ${sub === 1 ? "caixa" : "caixes"}`);
+      });
+      lines.push("");
+    });
+
+    const ab1 = fruitSummary.albercoc["1"], ab2 = fruitSummary.albercoc["2"];
+    const abTotal = ab1.reduce((a, x) => a + x.qty, 0) + ab2.reduce((a, x) => a + x.qty, 0);
+    if (abTotal > 0) {
+      lines.push(`🟠 Albercoc — *${abTotal}*`);
+      if (ab1.length) lines.push(`  Tarrina 1kg: ${ab1.reduce((a, x) => a + x.qty, 0)}`);
+      if (ab2.length) lines.push(`  Caixa 2kg: ${ab2.reduce((a, x) => a + x.qty, 0)}`);
+      lines.push("");
+    }
+
+    const ci1 = fruitSummary.cirera["1"], ci2 = fruitSummary.cirera["2"];
+    const ciTotal = ci1.reduce((a, x) => a + x.qty, 0) + ci2.reduce((a, x) => a + x.qty, 0);
+    if (ciTotal > 0) {
+      lines.push(`🍒 Cirera — *${ciTotal}*`);
+      if (ci1.length) lines.push(`  Tarrina 1kg: ${ci1.reduce((a, x) => a + x.qty, 0)}`);
+      if (ci2.length) lines.push(`  Caixa 2kg: ${ci2.reduce((a, x) => a + x.qty, 0)}`);
+      lines.push("");
+    }
+
+    const meloTotal = fruitSummary.melo.reduce((a, x) => a + x.qty, 0);
+    if (meloTotal > 0) {
+      lines.push(`🍈 Meló — *${meloTotal} ${meloTotal === 1 ? "peça" : "peces"}*`);
+      lines.push("");
+    }
+
+    const sindriaTotal = fruitSummary.sindria.reduce((a, x) => a + x.qty, 0);
+    if (sindriaTotal > 0) {
+      lines.push(`🍉 Síndria — *${sindriaTotal} ${sindriaTotal === 1 ? "peça" : "peces"}*`);
+      lines.push("");
+    }
+
+    return lines.join("\n").trimEnd();
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(getSummaryText()).then(() => {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2500);
+    });
+  };
+
+  const hasAnything =
+    Object.keys(fruitSummary.pressecsGrouped).length > 0 ||
+    fruitSummary.albercoc["1"].length + fruitSummary.albercoc["2"].length > 0 ||
+    fruitSummary.cirera["1"].length + fruitSummary.cirera["2"].length > 0 ||
+    fruitSummary.melo.length > 0 || fruitSummary.sindria.length > 0;
 
   return (
     <>
@@ -266,7 +361,7 @@ function getDateLabel(dateStr) {
               type="text"
               placeholder="Busca un client..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={e => setSearch(e.target.value)}
               className="w-full px-4 py-2.5 border rounded-xl bg-white text-stone-800 placeholder-stone-400 shadow-sm focus:outline-none transition-all"
               style={{ borderColor: "#E7E5E4" }}
               onFocus={e => e.target.style.borderColor = "#F59E0B"}
@@ -299,7 +394,7 @@ function getDateLabel(dateStr) {
               &rsaquo;
             </button>
           </div>
-          {/* Lloc filter */}
+
           <div className="flex gap-1.5 overflow-x-auto pb-1 mb-3" style={{ scrollbarWidth: "none" }}>
             {["Tots els llocs", ...PLACES].map(place => (
               <button
@@ -315,8 +410,9 @@ function getDateLabel(dateStr) {
               </button>
             ))}
           </div>
+
           <div className="flex gap-2 mb-5">
-            <button onClick={() => setShowSummary(true)}
+            <button onClick={openSummary}
               className="flex-1 bg-white border border-stone-200 text-stone-700 px-3 py-2.5 rounded-xl flex items-center justify-center shadow-sm hover:bg-stone-50 text-sm font-medium transition-colors gap-1.5">
               <Package className="w-4 h-4" style={{ color: "#F59E0B" }} /> Resum
             </button>
@@ -343,94 +439,6 @@ function getDateLabel(dateStr) {
             </button>
           </div>
 
-          <AnimatePresence>
-            {showSummary && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="fixed inset-0 flex items-center justify-center z-50 p-4"
-                style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-                onClick={e => { if (e.target === e.currentTarget) setShowSummary(false); }}>
-                <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                  className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto shadow-2xl">
-                  <div className="sticky top-0 bg-white border-b border-stone-100 px-5 py-4 rounded-t-2xl flex items-center justify-between">
-                    <h2 className="text-base font-bold text-stone-900 flex items-center gap-2">
-                      <Package className="w-4 h-4" style={{ color: "#F59E0B" }} />
-                      Resum
-                      {filterPlace !== "Tots els llocs" && <span className="text-stone-500 font-normal">&middot; {filterPlace}</span>}
-                      {filterDate && <span className="text-stone-500 font-normal">&middot; {formatDate(filterDate)}</span>}
-                    </h2>
-                    <button onClick={() => setShowSummary(false)}
-                      className="w-8 h-8 flex items-center justify-center rounded-full text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors text-lg">
-                      &times;
-                    </button>
-                  </div>
-                  <div className="px-5 py-4 space-y-4 text-sm text-stone-700">
-                    {Object.keys(fruitSummary.pressecsGrouped).length > 0 && (
-                      <div>
-                        <div className="font-semibold text-stone-900 mb-2">Pressecs</div>
-                        {Object.entries(fruitSummary.pressecsGrouped).map(([type, sizes]) => {
-                          let typeTotal = 0;
-                          return (
-                            <div key={type} className="ml-3 mb-3">
-                              <div className="font-medium capitalize text-stone-800 mb-1">{type}</div>
-                              {Object.entries(sizes).sort(([a],[b])=>parseInt(a)-parseInt(b)).map(([size, list]) => {
-                                const subtotal = list.reduce((sum,x)=>sum+x.qty,0);
-                                typeTotal += subtotal;
-                                return (
-                                  <details key={size} className="ml-3 mb-1">
-                                    <summary className="cursor-pointer text-stone-600 hover:text-stone-900 select-none">
-                                      Cal.{size}: <strong>{subtotal}</strong> {subtotal===1?"caixa":"caixes"}
-                                    </summary>
-                                    <ul className="ml-4 mt-1 space-y-0.5 text-stone-500 list-disc">
-                                      {list.map((entry,i) => <li key={i}>{entry.qty}x {entry.customer}</li>)}
-                                    </ul>
-                                  </details>
-                                );
-                              })}
-                              <div className="ml-3 text-xs font-semibold text-stone-400 mt-1">Total {type}: {typeTotal} {typeTotal===1?"caixa":"caixes"}</div>
-                            </div>
-                          );
-                        })}
-                        {(() => {
-                          const t = Object.values(fruitSummary.pressecs).flat().reduce((acc,x)=>acc+x.qty,0);
-                          return <div className="font-bold text-stone-800 border-t border-stone-100 pt-2">Total pressecs: {t} {t===1?"caixa":"caixes"}</div>;
-                        })()}
-                      </div>
-                    )}
-                    {["albercoc","cirera"].map(fruit => {
-                      const l1=fruitSummary[fruit]["1"], l2=fruitSummary[fruit]["2"];
-                      const t1=l1.reduce((a,x)=>a+x.qty,0), t2=l2.reduce((a,x)=>a+x.qty,0);
-                      if (!l1.length && !l2.length) return null;
-                      return (
-                        <div key={fruit}>
-                          <div className="font-semibold text-stone-900 mb-2">{capitalize(fruit)}</div>
-                          {l1.length>0 && <details className="ml-3 mb-1"><summary className="cursor-pointer text-stone-600 hover:text-stone-900 select-none">Tarrina (1kg): <strong>{t1}</strong></summary><ul className="ml-4 mt-1 space-y-0.5 text-stone-500 list-disc">{l1.map((e,i)=><li key={i}>{e.qty}x {e.customer}</li>)}</ul></details>}
-                          {l2.length>0 && <details className="ml-3 mb-1"><summary className="cursor-pointer text-stone-600 hover:text-stone-900 select-none">Caixa (2kg): <strong>{t2}</strong></summary><ul className="ml-4 mt-1 space-y-0.5 text-stone-500 list-disc">{l2.map((e,i)=><li key={i}>{e.qty}x {e.customer}</li>)}</ul></details>}
-                        </div>
-                      );
-                    })}
-                    {["melo","sindria"].map(fruit => (
-                      fruitSummary[fruit].length>0 && (
-                        <div key={fruit}>
-                          <div className="font-semibold text-stone-900 mb-2">{capitalize(fruit)}</div>
-                          <details className="ml-3 mb-1">
-                            <summary className="cursor-pointer text-stone-600 hover:text-stone-900 select-none">
-                              {(() => { const t=fruitSummary[fruit].reduce((a,x)=>a+x.qty,0); return <><strong>{t}</strong> {t===1?"peca":"peces"}</>; })()}
-                            </summary>
-                            <ul className="ml-4 mt-1 space-y-0.5 text-stone-500 list-disc">{fruitSummary[fruit].map((e,i)=><li key={i}>{e.qty}x {e.customer}</li>)}</ul>
-                          </details>
-                        </div>
-                      )
-                    ))}
-                    {!Object.keys(fruitSummary.pressecsGrouped).length && !fruitSummary.albercoc["1"].length && !fruitSummary.albercoc["2"].length && !fruitSummary.cirera["1"].length && !fruitSummary.cirera["2"].length && !fruitSummary.melo.length && !fruitSummary.sindria.length && (
-                      <div className="text-center text-stone-400 py-6">Cap fruita per mostrar</div>
-                    )}
-                  </div>
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           {loading ? (
             <div className="flex flex-col items-center justify-center mt-20">
               <div className="w-10 h-10 border-4 border-amber-100 border-t-amber-400 rounded-full animate-spin mb-3"></div>
@@ -447,7 +455,7 @@ function getDateLabel(dateStr) {
           ) : (
             <motion.div layout>
               <AnimatePresence mode="popLayout">
-                {filteredOrders.map((order) => (
+                {filteredOrders.map(order => (
                   <motion.div
                     key={order.id} layout
                     initial={{ opacity: 0, y: sortNewestFirst ? 16 : -16 }}
@@ -521,6 +529,7 @@ function getDateLabel(dateStr) {
             </motion.div>
           )}
 
+          {/* ── Delete confirm ── */}
           <AnimatePresence>
             {showConfirm && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -553,6 +562,276 @@ function getDateLabel(dateStr) {
 
         </div>
       </div>
+
+      {/* ── Summary bottom sheet ── */}
+      <AnimatePresence>
+        {showSummary && (
+          <>
+            <motion.div
+              key="backdrop"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40"
+              style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+              onClick={() => setShowSummary(false)}
+            />
+            <motion.div
+              key="sheet"
+              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+              transition={{ type: "spring", stiffness: 320, damping: 38 }}
+              className="fixed bottom-0 inset-x-0 z-50 bg-white rounded-t-3xl flex flex-col shadow-2xl"
+              style={{ maxHeight: "88vh" }}
+            >
+              {/* Drag handle */}
+              <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+                <div className="w-10 h-1 rounded-full bg-stone-200" />
+              </div>
+
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-2 flex-shrink-0">
+                <h2 className="text-lg font-bold text-stone-900 flex items-center gap-2">
+                  <Package className="w-5 h-5" style={{ color: "#F59E0B" }} />
+                  Resum
+                </h2>
+                <button onClick={() => setShowSummary(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full text-stone-400 hover:bg-stone-100 text-xl transition-colors">
+                  &times;
+                </button>
+              </div>
+
+              {/* Context banner */}
+              {(filterPlace !== "Tots els llocs" || filterDate) && (
+                <div className="mx-4 mb-2 px-4 py-2.5 rounded-xl flex-shrink-0"
+                  style={{ backgroundColor: "#FFFBEB", border: "1px solid #FDE68A" }}>
+                  <p className="text-sm font-semibold text-stone-800">
+                    {[filterPlace !== "Tots els llocs" ? filterPlace : null, filterDate ? getDateLabelFull(filterDate) : null].filter(Boolean).join(" · ")}
+                  </p>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    {filteredOrders.filter(o => o.status !== "cancelled").length} comandes
+                  </p>
+                </div>
+              )}
+
+              {/* Scrollable fruit cards */}
+              <div className="overflow-y-auto flex-1 px-4 pb-3 space-y-2.5">
+
+                {/* Pressec */}
+                {Object.entries(fruitSummary.pressecsGrouped).map(([variant, sizes]) => {
+                  const total = Object.values(sizes).flat().reduce((a, x) => a + x.qty, 0);
+                  const key   = `pressec_${variant}`;
+                  const isExp = expandedFruits.has(key);
+                  const st    = FRUIT_CARD_STYLE.pressec;
+                  return (
+                    <div key={key} className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${st.border}` }}>
+                      <button onClick={() => toggleFruit(key)}
+                        className="w-full flex items-center gap-3 px-4 py-4 text-left"
+                        style={{ backgroundColor: st.bg }}>
+                        <span className="text-xl flex-shrink-0">🍑</span>
+                        <span className="flex-1 font-bold text-stone-900 capitalize">Pressec {variant}</span>
+                        <span className="text-4xl font-black leading-none tabular-nums" style={{ color: st.numColor }}>{total}</span>
+                        <span className="text-xs text-stone-500 w-9 text-left">{total === 1 ? "caixa" : "caixes"}</span>
+                        <ChevronDown className={`w-4 h-4 text-stone-400 flex-shrink-0 transition-transform ${isExp ? "rotate-180" : ""}`} />
+                      </button>
+                      {isExp && (
+                        <div className="bg-white px-4 py-3 border-t space-y-3" style={{ borderColor: st.border }}>
+                          {Object.entries(sizes).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([size, list]) => {
+                            const sub = list.reduce((a, x) => a + x.qty, 0);
+                            return (
+                              <div key={size}>
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <span className="text-sm font-semibold text-stone-700">Cal.{size}</span>
+                                  <span className="text-sm font-bold" style={{ color: st.numColor }}>{sub} {sub === 1 ? "caixa" : "caixes"}</span>
+                                </div>
+                                <div className="space-y-1 pl-2">
+                                  {list.map((e, i) => (
+                                    <div key={i} className="flex items-center justify-between text-xs text-stone-500">
+                                      <span>{e.customer}</span>
+                                      <span className="font-medium">{e.qty} {e.qty === 1 ? "caixa" : "caixes"}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Albercoc */}
+                {(() => {
+                  const l1 = fruitSummary.albercoc["1"], l2 = fruitSummary.albercoc["2"];
+                  const total = l1.reduce((a, x) => a + x.qty, 0) + l2.reduce((a, x) => a + x.qty, 0);
+                  if (total === 0) return null;
+                  const key = "albercoc"; const isExp = expandedFruits.has(key); const st = FRUIT_CARD_STYLE.albercoc;
+                  return (
+                    <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${st.border}` }}>
+                      <button onClick={() => toggleFruit(key)} className="w-full flex items-center gap-3 px-4 py-4 text-left" style={{ backgroundColor: st.bg }}>
+                        <span className="text-xl flex-shrink-0">🟠</span>
+                        <span className="flex-1 font-bold text-stone-900">Albercoc</span>
+                        <span className="text-4xl font-black leading-none tabular-nums" style={{ color: st.numColor }}>{total}</span>
+                        <span className="w-9" />
+                        <ChevronDown className={`w-4 h-4 text-stone-400 flex-shrink-0 transition-transform ${isExp ? "rotate-180" : ""}`} />
+                      </button>
+                      {isExp && (
+                        <div className="bg-white px-4 py-3 border-t space-y-3" style={{ borderColor: st.border }}>
+                          {l1.length > 0 && (
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-sm font-semibold text-stone-700">Tarrina (1 kg)</span>
+                                <span className="text-sm font-bold" style={{ color: st.numColor }}>{l1.reduce((a, x) => a + x.qty, 0)}</span>
+                              </div>
+                              <div className="space-y-1 pl-2">
+                                {l1.map((e, i) => <div key={i} className="flex items-center justify-between text-xs text-stone-500"><span>{e.customer}</span><span className="font-medium">{e.qty}</span></div>)}
+                              </div>
+                            </div>
+                          )}
+                          {l2.length > 0 && (
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-sm font-semibold text-stone-700">Caixa (2 kg)</span>
+                                <span className="text-sm font-bold" style={{ color: st.numColor }}>{l2.reduce((a, x) => a + x.qty, 0)}</span>
+                              </div>
+                              <div className="space-y-1 pl-2">
+                                {l2.map((e, i) => <div key={i} className="flex items-center justify-between text-xs text-stone-500"><span>{e.customer}</span><span className="font-medium">{e.qty}</span></div>)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Cirera */}
+                {(() => {
+                  const l1 = fruitSummary.cirera["1"], l2 = fruitSummary.cirera["2"];
+                  const total = l1.reduce((a, x) => a + x.qty, 0) + l2.reduce((a, x) => a + x.qty, 0);
+                  if (total === 0) return null;
+                  const key = "cirera"; const isExp = expandedFruits.has(key); const st = FRUIT_CARD_STYLE.cirera;
+                  return (
+                    <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${st.border}` }}>
+                      <button onClick={() => toggleFruit(key)} className="w-full flex items-center gap-3 px-4 py-4 text-left" style={{ backgroundColor: st.bg }}>
+                        <span className="text-xl flex-shrink-0">🍒</span>
+                        <span className="flex-1 font-bold text-stone-900">Cirera</span>
+                        <span className="text-4xl font-black leading-none tabular-nums" style={{ color: st.numColor }}>{total}</span>
+                        <span className="w-9" />
+                        <ChevronDown className={`w-4 h-4 text-stone-400 flex-shrink-0 transition-transform ${isExp ? "rotate-180" : ""}`} />
+                      </button>
+                      {isExp && (
+                        <div className="bg-white px-4 py-3 border-t space-y-3" style={{ borderColor: st.border }}>
+                          {l1.length > 0 && (
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-sm font-semibold text-stone-700">Tarrina (1 kg)</span>
+                                <span className="text-sm font-bold" style={{ color: st.numColor }}>{l1.reduce((a, x) => a + x.qty, 0)}</span>
+                              </div>
+                              <div className="space-y-1 pl-2">
+                                {l1.map((e, i) => <div key={i} className="flex items-center justify-between text-xs text-stone-500"><span>{e.customer}</span><span className="font-medium">{e.qty}</span></div>)}
+                              </div>
+                            </div>
+                          )}
+                          {l2.length > 0 && (
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-sm font-semibold text-stone-700">Caixa (2 kg)</span>
+                                <span className="text-sm font-bold" style={{ color: st.numColor }}>{l2.reduce((a, x) => a + x.qty, 0)}</span>
+                              </div>
+                              <div className="space-y-1 pl-2">
+                                {l2.map((e, i) => <div key={i} className="flex items-center justify-between text-xs text-stone-500"><span>{e.customer}</span><span className="font-medium">{e.qty}</span></div>)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Meló */}
+                {(() => {
+                  const list = fruitSummary.melo;
+                  const total = list.reduce((a, x) => a + x.qty, 0);
+                  if (total === 0) return null;
+                  const key = "melo"; const isExp = expandedFruits.has(key); const st = FRUIT_CARD_STYLE.melo;
+                  return (
+                    <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${st.border}` }}>
+                      <button onClick={() => toggleFruit(key)} className="w-full flex items-center gap-3 px-4 py-4 text-left" style={{ backgroundColor: st.bg }}>
+                        <span className="text-xl flex-shrink-0">🍈</span>
+                        <span className="flex-1 font-bold text-stone-900">Meló</span>
+                        <span className="text-4xl font-black leading-none tabular-nums" style={{ color: st.numColor }}>{total}</span>
+                        <span className="text-xs text-stone-500 w-9 text-left">{total === 1 ? "peça" : "peces"}</span>
+                        <ChevronDown className={`w-4 h-4 text-stone-400 flex-shrink-0 transition-transform ${isExp ? "rotate-180" : ""}`} />
+                      </button>
+                      {isExp && (
+                        <div className="bg-white px-4 py-3 border-t space-y-1" style={{ borderColor: st.border }}>
+                          {list.map((e, i) => (
+                            <div key={i} className="flex items-center justify-between text-xs text-stone-500">
+                              <span>{e.customer}</span>
+                              <span className="font-medium">{e.qty} {e.qty === 1 ? "peça" : "peces"}{e.weight ? ` · ${e.weight} kg` : ""}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Síndria */}
+                {(() => {
+                  const list = fruitSummary.sindria;
+                  const total = list.reduce((a, x) => a + x.qty, 0);
+                  if (total === 0) return null;
+                  const key = "sindria"; const isExp = expandedFruits.has(key); const st = FRUIT_CARD_STYLE.sindria;
+                  return (
+                    <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${st.border}` }}>
+                      <button onClick={() => toggleFruit(key)} className="w-full flex items-center gap-3 px-4 py-4 text-left" style={{ backgroundColor: st.bg }}>
+                        <span className="text-xl flex-shrink-0">🍉</span>
+                        <span className="flex-1 font-bold text-stone-900">Síndria</span>
+                        <span className="text-4xl font-black leading-none tabular-nums" style={{ color: st.numColor }}>{total}</span>
+                        <span className="text-xs text-stone-500 w-9 text-left">{total === 1 ? "peça" : "peces"}</span>
+                        <ChevronDown className={`w-4 h-4 text-stone-400 flex-shrink-0 transition-transform ${isExp ? "rotate-180" : ""}`} />
+                      </button>
+                      {isExp && (
+                        <div className="bg-white px-4 py-3 border-t space-y-1" style={{ borderColor: st.border }}>
+                          {list.map((e, i) => (
+                            <div key={i} className="flex items-center justify-between text-xs text-stone-500">
+                              <span>{e.customer}</span>
+                              <span className="font-medium">{e.qty} {e.qty === 1 ? "peça" : "peces"}{e.weight ? ` · ${e.weight} kg` : ""}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {!hasAnything && (
+                  <div className="text-center py-12">
+                    <span className="text-4xl block mb-2">🍑</span>
+                    <p className="text-stone-400">Cap fruita per mostrar</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Copy button */}
+              <div className="px-4 py-4 border-t border-stone-100 flex-shrink-0">
+                <button
+                  onClick={handleCopy}
+                  className="w-full py-3.5 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 transition-all active:scale-95"
+                  style={copySuccess
+                    ? { backgroundColor: "#D1FAE5", color: "#059669", border: "1.5px solid #A7F3D0" }
+                    : { backgroundColor: "#F5F5F4", color: "#374151", border: "1.5px solid #E7E5E4" }
+                  }
+                >
+                  {copySuccess ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copySuccess ? "Resum copiat!" : "Copiar resum"}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </>
   );
 }
@@ -571,13 +850,13 @@ function renderFruitDetails(item) {
     const label = item.qty > 1 ? (item.weight === 1 ? "Tarrines" : "Caixes") : (item.weight === 1 ? "Tarrina" : "Caixa");
     return `Cirera: ${item.qty} ${label} (${item.weight}kg)`;
   }
-  if (item.fruit === "melo") return `Melo: ${item.qty} peces${item.weight ? ` - ${item.weight} kg` : ""}`;
+  if (item.fruit === "melo")    return `Melo: ${item.qty} peces${item.weight ? ` - ${item.weight} kg` : ""}`;
   if (item.fruit === "sindria") return `Sindria: ${item.qty} peces${item.weight ? ` - ${item.weight} kg` : ""}`;
   return `${capitalize(item.fruit)}: ${item.qty}`;
 }
 
 function formatDate(dateStr) {
-  const [yyyy, mm, dd] = dateStr.split("-");
+  const [, mm, dd] = dateStr.split("-");
   return `${dd}/${mm}`;
 }
 
