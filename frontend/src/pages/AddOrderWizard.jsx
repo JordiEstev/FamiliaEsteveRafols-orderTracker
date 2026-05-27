@@ -13,7 +13,6 @@ const PLACE_DATE_TYPE = {
   "Puigdalber": "wednesday",
   "Sant Pau":   "weekend",
   "Cantallops": "any",
-  "Vilafranca": "any",
 };
 
 const FRUIT_EMOJI = {

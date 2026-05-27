@@ -2,7 +2,11 @@
 __pycache__/
 *.pyc
 venv/
-database.db
+
+# SQLite databases (never commit these — use DATABASE_URL env var in production)
+*.db
+*.db-shm
+*.db-wal
 
 # Node
 node_modules/

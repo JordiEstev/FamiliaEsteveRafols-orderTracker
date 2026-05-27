@@ -171,15 +171,13 @@ export default function PickingListPage() {
     <div className="picking-root">
       {/* ── Screen header ── */}
       <div className="no-print picking-header">
-        <div className="picking-header-left">
-          <button onClick={() => navigate("/")} className="picking-back-btn">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="picking-title">Llista de Recollida</h1>
-            <p className="picking-subtitle">{checkedCount}/{totalCount} clients marcats</p>
-          </div>
-        </div>
+        <button onClick={() => navigate("/")} className="picking-back-btn">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <img src="/logopressec1.png" alt="Logo"
+          className="absolute left-1/2 h-10 w-10 object-contain"
+          style={{ transform: "translateX(-50%)" }}
+        />
         <div className="picking-header-right">
           <button onClick={() => window.print()} className="picking-btn picking-btn-ghost">
             <Printer className="w-4 h-4" />
@@ -201,10 +199,16 @@ export default function PickingListPage() {
         <button onClick={() => setFilterDate(prev => addDays(prev, -1))} className="picking-arrow">&#8249;</button>
         <div className="relative">
           <button onClick={() => document.getElementById("pick-date").showPicker?.()} className="picking-date-btn">
-            {getDateLabel(filterDate)}
+            {filterDate ? getDateLabel(filterDate) : "Totes les dates"}
           </button>
-          <input id="pick-date" type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)}
-            className="absolute inset-0 opacity-0 cursor-pointer" />
+          <input
+            id="pick-date"
+            type="date"
+            value={filterDate}
+            onChange={e => setFilterDate(e.target.value)}
+            className="absolute opacity-0 pointer-events-none"
+            style={{ top: 0, left: 0, width: "1px", height: "1px" }}
+          />
         </div>
         <button onClick={() => setFilterDate(prev => addDays(prev, 1))} className="picking-arrow">&#8250;</button>
         <div className="picking-date-nav-spacer" />

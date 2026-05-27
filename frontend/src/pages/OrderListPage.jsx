@@ -239,11 +239,8 @@ function getDateLabel(dateStr) {
       <div className="min-h-screen" style={{ backgroundColor: "#FAFAF5" }}>
         <div className="max-w-md mx-auto px-4 pt-6 pb-10">
 
-          <div className="flex items-center gap-3 mb-6">
-            <img src="/logopressec1.png" alt="Logo" className="h-12 w-12 object-contain" />
-            <div>
-              <h1 className="text-lg font-bold text-stone-900 leading-tight">Família Esteve Ràfols</h1>
-            </div>
+          <div className="flex justify-center mb-6">
+            <img src="/logopressec1.png" alt="Logo" className="h-16 w-16 object-contain" />
           </div>
 
           <button
@@ -279,25 +276,32 @@ function getDateLabel(dateStr) {
 
           <div className="flex items-center gap-1.5 mb-3">
             <button onClick={() => setFilterDate(prev => prev ? addDays(prev, -1) : today)}
-              className="p-2.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 shadow-sm text-stone-600 leading-none text-lg font-medium transition-colors">
+              className="p-2.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 shadow-sm text-stone-600 leading-none text-lg font-medium transition-colors flex-shrink-0">
               &lsaquo;
             </button>
-            <div className="relative flex-1">
-              <button onClick={() => document.getElementById("date-picker").showPicker?.()}
+            <div className="flex-1 relative">
+              <button
+                onClick={() => document.getElementById("date-picker").showPicker?.()}
                 className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-xl shadow-sm text-sm font-semibold text-stone-700 text-center hover:bg-stone-50 transition-colors">
                 {filterDate ? getDateLabel(filterDate) : "Totes les dates"}
               </button>
-              <input id="date-picker" type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)}
-                className="absolute inset-0 opacity-0 w-full cursor-pointer" />
+              <input
+                id="date-picker"
+                type="date"
+                value={filterDate}
+                onChange={e => setFilterDate(e.target.value)}
+                className="absolute opacity-0 pointer-events-none"
+                style={{ top: 0, left: 0, width: "1px", height: "1px" }}
+              />
             </div>
             <button onClick={() => setFilterDate(prev => prev ? addDays(prev, 1) : today)}
-              className="p-2.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 shadow-sm text-stone-600 leading-none text-lg font-medium transition-colors">
+              className="p-2.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 shadow-sm text-stone-600 leading-none text-lg font-medium transition-colors flex-shrink-0">
               &rsaquo;
             </button>
           </div>
           {/* Lloc filter */}
           <div className="flex gap-1.5 overflow-x-auto pb-1 mb-3" style={{ scrollbarWidth: "none" }}>
-            {["Tots els llocs", "Sant Pau", "La Girada", "Cantallops", "El Pla", "Puigdalber"].map(place => (
+            {["Tots els llocs", ...PLACES].map(place => (
               <button
                 key={place}
                 onClick={() => setFilterPlace(place)}
