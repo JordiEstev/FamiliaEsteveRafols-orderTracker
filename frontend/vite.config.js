@@ -26,11 +26,11 @@ export default defineConfig({
           // 2. Encola los POST cuando no hay red
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/orders'),
-            handler: 'NetworkOnly', // Usamos NetworkOnly para mutaciones
+            handler: 'NetworkOnly',
             method: 'POST',
             options: {
               backgroundSync: {
-                name: 'orders-queue',
+                name: 'orders-queue-post',
                 options: { maxRetentionTime: 24 * 60 },
               },
             },
@@ -42,7 +42,7 @@ export default defineConfig({
             method: 'PUT',
             options: {
               backgroundSync: {
-                name: 'orders-queue',
+                name: 'orders-queue-put',
                 options: { maxRetentionTime: 24 * 60 },
               },
             },
@@ -54,7 +54,7 @@ export default defineConfig({
             method: 'DELETE',
             options: {
               backgroundSync: {
-                name: 'orders-queue',
+                name: 'orders-queue-delete',
                 options: { maxRetentionTime: 24 * 60 },
               },
             },
