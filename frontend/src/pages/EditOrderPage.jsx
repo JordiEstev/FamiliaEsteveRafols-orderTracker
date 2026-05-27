@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import FruitSelectorModal from "../components/FruitSelectorModal"; // adjust if path differs
 import { Pencil} from "lucide-react";
-
+import { FRUIT_TYPES, PEACH_SIZES, renderFruitLabel, renderFruitDetails } from "../utils/fruit";
 
 export default function EditOrderPage() {
   const navigate = useNavigate();
@@ -160,7 +160,6 @@ export default function EditOrderPage() {
           >
             <option>Sant Pau</option>
             <option>Cantallops</option>
-            <option>Vilafranca</option>
             <option>La Girada</option>
           </select>
         </div>
@@ -240,47 +239,4 @@ export default function EditOrderPage() {
       </form>
     </div>
   );
-}
-
-function renderFruitLabel(item) {
-  if (item.fruit === "pressec_barrejat") {
-    return "Pressec barrejat";
-  }
-  if (item.fruit.startsWith("pressec_")) {
-    const variant = item.fruit.split("_")[1];
-    return `Pressec ${variant}`;
-  }
-
-  const map = {
-    albercoc: "Albercoc",
-    cirera: "Cirera",
-    melo: "Meló",
-    sindria: "Síndria"
-  };
-  return map[item.fruit] || item.fruit;
-}
-
-function renderFruitDetails(item) {
-    if (item.fruit.startsWith("pressec_")) {
-    const variant = item.fruit.split("_")[1];
-    const label = item.qty === 1 ? "caixa" : "caixes";
-    return `Préssec ${variant}: ${item.qty} ${label} ${item.size}`;
-  }
-  
-  if (item.fruit === "albercoc" || item.fruit === "cirera") {
-    const singular = item.weight === 1 ? "Tarrina" : "Caixa";
-    const plural = item.weight === 1 ? "Tarrines" : "Caixes";
-    const label = item.qty > 1 ? plural : singular;
-    return `${capitalize(item.fruit)}: ${item.qty} ${label} (${item.weight}kg)`;
-  }
-
-   if (item.fruit === "melo" || item.fruit === "sindria") {
-    const label = item.qty === 1 ? "peça" : "peces";
-    return `${capitalize(item.fruit)}: ${item.qty} ${label}${item.weight ? ` · ${item.weight} kg` : ''}`;
-  }
-
-}
-
-function capitalize(str) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
 }

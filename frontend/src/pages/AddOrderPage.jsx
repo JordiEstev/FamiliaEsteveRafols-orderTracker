@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import FruitSelectorModal from "../components/FruitSelectorModal";
+import { motion } from "framer-motion";
+
+import { FRUIT_TYPES, PEACH_SIZES, renderFruitLabel, renderFruitDetails } from "../utils/fruit";
 
 export default function AddOrderPage() {
   const navigate = useNavigate();
@@ -99,6 +102,12 @@ export default function AddOrderPage() {
   };
 
   return (
+        <motion.div
+      initial={{ opacity: 0, x: 100 }}   // starts off-screen right
+      animate={{ opacity: 1, x: 0 }}     // fades/slides in
+      exit={{ opacity: 0, x: -100 }}     // slides left on exit
+      transition={{ duration: 0.3 }}
+      >
     <div className="bg-gray-950 min-h-screen text-gray-100 p-5 font-sans">
       {showSuccess && (
         <div className="fixed top-3 left-1/2 transform -translate-x-1/2 z-50">
@@ -161,7 +170,6 @@ export default function AddOrderPage() {
             </option>
             <option>Sant Pau</option>
             <option>Cantallops</option>
-            <option>Vilafranca</option>
             <option>La Girada</option>
           </select>
         </div>
@@ -248,45 +256,7 @@ export default function AddOrderPage() {
       </form>
 
     </div>
+        </motion.div>
+
   );
-}
-
-
-function renderFruitLabel(item) {
-  if (item.fruit.startsWith("pressec_")) {
-    const variant = item.fruit.split("_")[1]; // groc / vermell
-    return `Pressec ${variant}`;
-  }
-  const map = {
-    albercoc: "Albercoc",
-    cirera: "Cirera",
-    melo: "Meló",
-    sindria: "Síndria"
-  };
-  return map[item.fruit] || item.fruit;
-}
-
-function renderFruitDetails(item) {
-    if (item.fruit.startsWith("pressec_")) {
-    const variant = item.fruit.split("_")[1];
-    const label = item.qty === 1 ? "caixa" : "caixes";
-    return `Préssec ${variant}: ${item.qty} ${label} ${item.size}`;
-  }
-  
-  if (item.fruit === "albercoc" || item.fruit === "cirera") {
-    const singular = item.weight === 1 ? "Tarrina" : "Caixa";
-    const plural = item.weight === 1 ? "Tarrines" : "Caixes";
-    const label = item.qty > 1 ? plural : singular;
-    return `${capitalize(item.fruit)}: ${item.qty} ${label} (${item.weight}kg)`;
-  }
-
-   if (item.fruit === "melo" || item.fruit === "sindria") {
-    const label = item.qty === 1 ? "peça" : "peces";
-    return `${capitalize(item.fruit)}: ${item.qty} ${label}${item.weight ? ` · ${item.weight} kg` : ''}`;
-  }
-
-}
-
-function capitalize(str) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
 }

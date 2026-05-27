@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import { useLocation } from 'react-router-dom';
 import './OrderListPage.css'; // Add this import for custom styles
 import { motion, AnimatePresence } from "framer-motion";
+import { renderFruitExportLine, PLACES } from "../utils/fruit";
 
 
 
@@ -38,26 +39,7 @@ function handleExport() {
   for (const order of filteredOrders) {
     const customer = order.customer;
     if (!customerOrders[customer]) customerOrders[customer] = [];
-
-    for (const item of order.fruits) {
-      let description = "";
-
-      if (item.fruit.startsWith("pressec_")) {
-        const type = item.fruit.split("_")[1]; // groc, vermell, barrejat
-        description = `Pressec ${type} ${item.qty} ${item.qty > 1 ? 'caixes' : 'caixa'} ${item.size}`;
-      } else if (item.fruit === "albercoc" || item.fruit === "cirera") {
-        const singular = item.weight === 1 ? "Tarrina" : "Caixa";
-        const plural = item.weight === 1 ? "Tarrines" : "Caixes";
-        const label = item.qty > 1 ? plural : singular;
-        description = `${capitalize(item.fruit)}: ${item.qty} ${label}`;
-      } else if (item.fruit === "melo" || item.fruit === "sindria") {
-        description = `${capitalize(item.fruit)} ${item.qty} peces`;
-      } else {
-        description = `${capitalize(item.fruit)}: ${item.qty}`;
-      }
-
-      customerOrders[customer].push(description);
-    }
+    description = renderFruitExportLine(item);
   }
 
   for (const [customer, items] of Object.entries(customerOrders)) {
@@ -146,27 +128,23 @@ function formatFullDate(isoDateStr) {
 
 
 useEffect(() => {
-  fetch(`${import.meta.env.VITE_API_URL}/orders`)
+  setLoading(true);
+  const params = new URLSearchParams();
+  if (filterDate)                        params.set("date", filterDate);
+  if (filterPlace !== "Tots els llocs")  params.set("place", filterPlace);
+
+  fetch(`${import.meta.env.VITE_API_URL}/orders?${params}`)
     .then(res => {
-      if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
       return res.json();
     })
-    .then(data => {
-      setOrders(data);
-      setLoading(false);
-    })
+    .then(data => { setOrders(data); setLoading(false); })
     .catch(err => {
-      console.error("Error loading orders:", err.message);
-      if (err.message.includes("NetworkError") || err.message === "Failed to fetch") {
-        setError("No hi ha connexió amb el servidor.");
-      } else {
-        setError("No s'han pogut carregar les comandes.");
-      }
-      setLoading(false); 
+      console.error(err);
+      setError("No s'han pogut carregar les comandes.");
+      setLoading(false);
     });
-}, []);
+}, [filterDate, filterPlace]);   //recarga cuando cambian los filtros
 
 
 useEffect(() => {
@@ -348,7 +326,6 @@ Afegir Comanda
           <option>Tots els llocs</option>
           <option>Sant Pau</option>
           <option>Cantallops</option>
-          <option>Vilafranca</option>
           <option>La Girada</option>
         </select>
         <button
