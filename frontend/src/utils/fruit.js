@@ -10,7 +10,8 @@ export const FRUIT_TYPES = [
 
 export const PEACH_SIZES = [15, 16, 18, 20, 22, 24, 26];
 
-export const PLACES = ["Sant Pau", "La Girada", "Cantallops", "Vilafranca", "El Pla", "Puigdalber"];
+export const PLACES = ["Sant Pau", "La Girada", "Cantallops"];
+
 export function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }

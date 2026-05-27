@@ -10,11 +10,12 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
-        // Cachea GET /orders durante 5 minutos (útil con mala cobertura)
         runtimeCaching: [
+          // 1. Cachea los GET de /orders durante 5 minutos
           {
-            urlPattern: ({ url }) => url.pathname.startsWith('/orders') && !url.search.includes('method=POST'),
+            urlPattern: ({ url }) => url.pathname.startsWith('/orders'),
             handler: 'NetworkFirst',
+            method: 'GET', // Específicamos el método
             options: {
               cacheName: 'orders-cache',
               networkTimeoutSeconds: 5,
@@ -22,12 +23,43 @@ export default defineConfig({
               cacheableResponse: { statuses: [0, 200] },
             },
           },
+          // 2. Encola los POST cuando no hay red
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/orders'),
+            handler: 'NetworkOnly', // Usamos NetworkOnly para mutaciones
+            method: 'POST',
+            options: {
+              backgroundSync: {
+                name: 'orders-queue',
+                options: { maxRetentionTime: 24 * 60 },
+              },
+            },
+          },
+          // 3. Encola los PUT cuando no hay red
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/orders'),
+            handler: 'NetworkOnly',
+            method: 'PUT',
+            options: {
+              backgroundSync: {
+                name: 'orders-queue',
+                options: { maxRetentionTime: 24 * 60 },
+              },
+            },
+          },
+          // 4. Encola los DELETE cuando no hay red
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/orders'),
+            handler: 'NetworkOnly',
+            method: 'DELETE',
+            options: {
+              backgroundSync: {
+                name: 'orders-queue',
+                options: { maxRetentionTime: 24 * 60 },
+              },
+            },
+          }
         ],
-        // Encola los POST/PUT/DELETE cuando no hay red
-        backgroundSync: {
-          name: 'orders-queue',
-          options: { maxRetentionTime: 24 * 60 },
-        },
       },
       manifest: {
         name: 'Família Esteve Ràfols',

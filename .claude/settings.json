@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\jordi\\\\FamiliaEsteveRafols-orderTracker\\\\frontend\\\\src\\\\\" -Recurse -File | Select-Object FullName)",
-      "Bash(Write-Output \"test\")",
-      "Bash(python3 \"c:/Users/jordi/FamiliaEsteveRafols-orderTracker/write_page.py\")"
-    ]
-  }
-}
