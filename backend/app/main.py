@@ -3,7 +3,7 @@ import traceback
 from datetime import date, datetime, timezone
 from typing import List, Optional, Literal
 
-from    fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from pydantic_settings import BaseSettings
