@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from pydantic_settings import BaseSettings
-from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, Text, DateTime, Date
+from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, Text, DateTime, Date, text
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker, Session, joinedload
 from pathlib import Path
 from pydantic import BaseModel, Field, model_validator, ConfigDict, field_validator
@@ -36,10 +36,10 @@ class OrderORM(Base):
     __tablename__ = "orders"
     id = Column(Integer, primary_key=True, index=True)
     customer = Column(String, nullable=False)
-    date = Column(Date, index=True)           # Punto 9: Date en vez de String
+    date = Column(Date, index=True)
     place = Column(String, index=True)
     notes = Column(Text, nullable=True)
-    # Punto 6: timezone-aware
+    status = Column(String, nullable=False, default="pending")
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     items = relationship("OrderItemORM", back_populates="order", cascade="all, delete-orphan")
@@ -58,14 +58,23 @@ class OrderItemORM(Base):
 
 Base.metadata.create_all(bind=engine)
 
+# Migrate existing DBs that lack the status column
+with engine.connect() as _conn:
+    try:
+        _conn.execute(text("ALTER TABLE orders ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'"))
+        _conn.commit()
+    except Exception:
+        pass  # column already exists
 
-# ---------- Punto 5: Pydantic v2 correcto ----------
+
+# ---------- Pydantic models ----------
+StatusLiteral = Literal["pending", "ready", "picked_up", "cancelled"]
+
 FruitCode = Literal[
     "pressec_groc", "pressec_vermell", "pressec_barrejat",
     "albercoc", "cirera", "melo", "sindria"
 ]
-PlaceName = Literal["Cantallops", "Sant Pau", "La Girada"]
-
+PlaceName = Literal["Cantallops", "Sant Pau", "La Girada", "El Pla", "Puigdalber"]
 
 class FruitItemIn(BaseModel):
     fruit: FruitCode
@@ -104,10 +113,15 @@ class FruitItemOut(FruitItemIn):
 
 class OrderCreate(BaseModel):
     customer: str
-    date: date                    # Punto 9: tipo date nativo de Python
+    date: date
     place: PlaceName
     notes: Optional[str] = ""
+    status: StatusLiteral = "pending"
     fruits: List[FruitItemIn]
+
+
+class StatusUpdate(BaseModel):
+    status: StatusLiteral
 
 
 class OrderOut(BaseModel):
@@ -116,6 +130,7 @@ class OrderOut(BaseModel):
     date: date
     place: str
     notes: Optional[str]
+    status: str
     created_at: datetime
     updated_at: datetime
     fruits: List[FruitItemOut] = []
@@ -151,12 +166,12 @@ def get_db():
         db.close()
 
 
-# ---------- Punto 8: filtros server-side en GET /orders ----------
 @app.get("/orders", response_model=List[OrderOut])
 def get_orders(
     date_filter: Optional[date] = Query(None, alias="date"),
     place: Optional[str] = Query(None),
     customer: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
     q = db.query(OrderORM).options(joinedload(OrderORM.items))
@@ -166,11 +181,12 @@ def get_orders(
         q = q.filter(OrderORM.place == place)
     if customer:
         q = q.filter(OrderORM.customer.ilike(f"%{customer}%"))
+    if status:
+        q = q.filter(OrderORM.status == status)
     orders = q.order_by(OrderORM.created_at.desc()).all()
     return orders
 
 
-# ---------- Punto 12: try/except en mutaciones ----------
 @app.post("/orders", response_model=OrderOut)
 def create_order(order: OrderCreate, db: Session = Depends(get_db)):
     try:
@@ -179,6 +195,7 @@ def create_order(order: OrderCreate, db: Session = Depends(get_db)):
             date=order.date,
             place=order.place,
             notes=order.notes,
+            status=order.status,
             items=[
                 OrderItemORM(fruit=i.fruit, size=i.size, qty=i.qty, weight=i.weight)
                 for i in order.fruits
@@ -204,6 +221,7 @@ def update_order(order_id: int, order: OrderCreate, db: Session = Depends(get_db
         db_order.date = order.date
         db_order.place = order.place
         db_order.notes = order.notes
+        db_order.status = order.status
         db_order.updated_at = datetime.now(timezone.utc)
         for item in db_order.items:
             db.delete(item)
@@ -238,3 +256,22 @@ def delete_order(order_id: int, db: Session = Depends(get_db)):
         db.rollback()
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Error intern en eliminar la comanda")
+
+
+@app.patch("/orders/{order_id}/status", response_model=OrderOut)
+def update_order_status(order_id: int, update: StatusUpdate, db: Session = Depends(get_db)):
+    try:
+        order = db.query(OrderORM).options(joinedload(OrderORM.items)).filter(OrderORM.id == order_id).first()
+        if not order:
+            raise HTTPException(404, "Comanda no trobada")
+        order.status = update.status
+        order.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(order)
+        return order
+    except HTTPException:
+        raise
+    except Exception:
+        db.rollback()
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Error intern en actualitzar l'estat")
