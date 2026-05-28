@@ -112,13 +112,13 @@ function OrderListPage() {
   const [showSuccess, setShowSuccess]     = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [sortMessage, setSortMessage]     = useState("");
-  const [showConfirm, setShowConfirm]     = useState(false);
-  const [orderToDelete, setOrderToDelete] = useState(null);
-
   // Pickup-undo toast state
   const [pendingPickup, setPendingPickup] = useState(null);
-  // pendingPickup = { orderId, customerName, place, date }
   const pickupTimerRef = useRef(null);
+
+  // Delete-undo toast state
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const deleteTimerRef = useRef(null);
 
   // Scroll-based FABs
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -172,7 +172,10 @@ function OrderListPage() {
 
   // Cleanup on unmount
   useEffect(() => {
-    return () => { if (pickupTimerRef.current) clearTimeout(pickupTimerRef.current); };
+    return () => {
+      if (pickupTimerRef.current) clearTimeout(pickupTimerRef.current);
+      if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+    };
   }, []);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -241,12 +244,30 @@ function OrderListPage() {
       .catch(() => setError("Error actualitzant l'estat."));
   };
 
-  const handleDelete   = (orderId) => { setShowConfirm(true); setOrderToDelete(orderId); };
-  const confirmDelete  = () => {
-    if (!orderToDelete) return;
-    fetch(`${import.meta.env.VITE_API_URL}/orders/${orderToDelete}`, { method: "DELETE" })
-      .then(res => { if (!res.ok) throw new Error(); setOrders(prev => prev.filter(o => o.id !== orderToDelete)); setOrderToDelete(null); setShowConfirm(false); })
-      .catch(() => { setError("Error eliminant la comanda."); setShowConfirm(false); });
+  const confirmDeleteNow = (orderId) => {
+    fetch(`${import.meta.env.VITE_API_URL}/orders/${orderId}`, { method: "DELETE" })
+      .catch(() => setError("Error eliminant la comanda."));
+  };
+
+  const handleDelete = (order) => {
+    if (pendingDelete) {
+      clearTimeout(deleteTimerRef.current);
+      confirmDeleteNow(pendingDelete.orderId);
+    }
+    setOrders(prev => prev.filter(o => o.id !== order.id));
+    deleteTimerRef.current = setTimeout(() => {
+      confirmDeleteNow(order.id);
+      setPendingDelete(null);
+      deleteTimerRef.current = null;
+    }, 3000);
+    setPendingDelete({ id: Date.now(), orderId: order.id, customerName: order.customer, orderData: order });
+  };
+
+  const handleUndoDelete = () => {
+    clearTimeout(deleteTimerRef.current);
+    deleteTimerRef.current = null;
+    setOrders(prev => [...prev, pendingDelete.orderData]);
+    setPendingDelete(null);
   };
 
   const toggleFruit  = (key) => setExpandedFruits(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
@@ -646,7 +667,7 @@ function OrderListPage() {
                             &times;
                           </button>
                         )}
-                        <button onClick={() => handleDelete(order.id)}
+                        <button onClick={() => handleDelete(order)}
                           className="bg-stone-50 hover:bg-red-50 text-stone-400 hover:text-red-500 border border-stone-200 hover:border-red-200 px-3 py-2 rounded-xl text-sm flex items-center transition-colors">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -657,37 +678,6 @@ function OrderListPage() {
               </AnimatePresence>
             </motion.div>
           )}
-
-          {/* ── Delete confirm modal ── */}
-          <AnimatePresence>
-            {showConfirm && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="fixed inset-0 flex items-center justify-center z-50 p-4"
-                style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
-                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                  className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-                  <div className="flex flex-col items-center text-center mb-5">
-                    <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mb-3">
-                      <Trash2 className="w-6 h-6 text-red-400" />
-                    </div>
-                    <h3 className="font-bold text-stone-900 mb-1">Eliminar comanda</h3>
-                    <p className="text-sm text-stone-500">Segur que vols esborrar aquesta comanda?</p>
-                  </div>
-                  <div className="flex gap-3">
-                    <button onClick={() => { setShowConfirm(false); setOrderToDelete(null); }}
-                      className="flex-1 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-medium text-sm transition-colors">
-                      Cancel
-                    </button>
-                    <button onClick={confirmDelete}
-                      className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors">
-                      Esborrar
-                    </button>
-                  </div>
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
 
         </div>
       </div>
@@ -960,6 +950,13 @@ function OrderListPage() {
         pending={pendingPickup}
         onUndo={handleUndoPickup}
         onNewOrder={handleNewOrderSameName}
+      />
+
+      {/* ── Delete undo toast ── */}
+      <PickupToast
+        pending={pendingDelete ? { ...pendingDelete, message: "Comanda eliminada" } : null}
+        onUndo={handleUndoDelete}
+        onNewOrder={null}
       />
 
       {/* ── FAB: scroll to top ── */}
