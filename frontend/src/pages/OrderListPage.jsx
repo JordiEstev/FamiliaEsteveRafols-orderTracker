@@ -201,22 +201,22 @@ function OrderListPage() {
       confirmPickupNow(pendingPickup.orderId);
     }
 
-    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, _pendingPickup: true } : o));
+    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, _pendingPickup: true, status: "picked_up" } : o));
 
     pickupTimerRef.current = setTimeout(() => {
       confirmPickupNow(order.id);
       setPendingPickup(null);
       pickupTimerRef.current = null;
-    }, 5000);
+    }, 3000);
 
-    setPendingPickup({ id: order.id, orderId: order.id, customerName: order.customer, place: order.place, date: order.date });
+    setPendingPickup({ id: order.id, orderId: order.id, customerName: order.customer, place: order.place, date: order.date, originalStatus: order.status });
   };
 
   const handleUndoPickup = () => {
     clearTimeout(pickupTimerRef.current);
     pickupTimerRef.current = null;
     setOrders(prev => prev.map(o =>
-      o.id === pendingPickup.orderId ? { ...o, _pendingPickup: false } : o
+      o.id === pendingPickup.orderId ? { ...o, _pendingPickup: false, status: pendingPickup.originalStatus } : o
     ));
     setPendingPickup(null);
   };

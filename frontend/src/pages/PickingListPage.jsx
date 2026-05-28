@@ -113,7 +113,8 @@ export default function PickingListPage() {
   const visibleCustomers = hideDone
     ? customers.filter(c => {
         const allPickedUp = grouped[c].every(o => o.status === "picked_up");
-        return !isCustomerDone(c) && !allPickedUp;
+        const hasPendingPickup = pendingPickup && grouped[c].some(o => pendingPickup.orderIds?.includes(o.id));
+        return (!isCustomerDone(c) && !allPickedUp) || hasPendingPickup;
       })
     : customers;
 
@@ -182,7 +183,7 @@ export default function PickingListPage() {
       confirmPickupApi(orderIds);
       setPendingPickup(null);
       pickupTimerRef.current = null;
-    }, 5000);
+    }, 3000);
 
     const singleCustomer = customerNames.length === 1 ? customerNames[0] : null;
     const firstCustOrders = singleCustomer ? (grouped[singleCustomer] || []) : [];

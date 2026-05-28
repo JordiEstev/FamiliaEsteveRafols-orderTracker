@@ -26,7 +26,7 @@ export default function PickupToast({ pending, onUndo, onNewOrder }) {
               style={{ transformOrigin: "left" }}
               initial={{ scaleX: 1 }}
               animate={{ scaleX: 0 }}
-              transition={{ duration: 5, ease: "linear" }}
+              transition={{ duration: 3, ease: "linear" }}
             />
           </div>
 
