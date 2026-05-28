@@ -231,6 +231,9 @@ export default function PickingListPage() {
   const checkedCount = visibleCustomers.filter(c =>
     isCustomerDone(c) || grouped[c].every(o => o.status === "picked_up")
   ).length;
+  const confirmableCount = visibleCustomers.filter(c =>
+    isCustomerDone(c) && !grouped[c].every(o => o.status === "picked_up")
+  ).length;
   const totalCount = visibleCustomers.length;
 
   const printTitle = [
@@ -261,7 +264,7 @@ export default function PickingListPage() {
           </button>
           <button
             onClick={applyPickups}
-            disabled={saving || checkedCount === 0}
+            disabled={saving || confirmableCount === 0}
             className="picking-btn picking-btn-primary"
           >
             <CheckCheck className="w-4 h-4" />
@@ -392,7 +395,7 @@ export default function PickingListPage() {
                   {custOrders.map(order =>
                     order.fruits.map((fruit, idx) => {
                       const key = itemKey(order.id, idx);
-                      const isChecked = checked.has(key) || order.status === "picked_up";
+                      const isChecked = checked.has(key);
                       return (
                         <div
                           key={key}
