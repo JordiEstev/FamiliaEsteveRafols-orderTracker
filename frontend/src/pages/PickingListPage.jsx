@@ -114,7 +114,7 @@ export default function PickingListPage() {
     ? customers.filter(c => {
         const allPickedUp = grouped[c].every(o => o.status === "picked_up");
         const hasPendingPickup = pendingPickup && grouped[c].some(o => pendingPickup.orderIds?.includes(o.id));
-        return (!isCustomerDone(c) && !allPickedUp) || hasPendingPickup;
+        return !allPickedUp || hasPendingPickup;
       })
     : customers;
 
