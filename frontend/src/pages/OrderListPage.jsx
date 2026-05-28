@@ -54,7 +54,7 @@ function formatDate(dateStr) {
 function formatFullDate(isoStr) {
   if (!isoStr) return "";
   const date = new Date(isoStr);
-  const parts = new Intl.DateTimeFormat('ca-ES', {
+  const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/Madrid',
     day: '2-digit', month: '2-digit',
     hour: '2-digit', minute: '2-digit',
@@ -594,12 +594,12 @@ function OrderListPage() {
                   >
                     <div className="p-4">
                       <div className="flex items-start justify-between gap-2 mb-2">
-                        <span className="font-bold text-stone-900 text-base leading-tight">{order.customer}</span>
+                        <span className="font-bold text-stone-900 text-base leading-tight truncate flex-1 min-w-0">{order.customer}</span>
                         <span className="text-xs text-stone-400 whitespace-nowrap mt-0.5 shrink-0">{formatFullDate(order.created_at)}</span>
                       </div>
                       <div className="space-y-0.5 mb-2">
                         {order.fruits.map((fruit, idx) => (
-                          <div key={idx} className="text-sm text-stone-600">{renderFruitDetails(fruit)}</div>
+                          <div key={idx} className="text-sm text-stone-600 truncate">{renderFruitDetails(fruit)}</div>
                         ))}
                       </div>
                       <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -614,7 +614,7 @@ function OrderListPage() {
                         <span className="text-xs text-stone-400">{formatDate(order.date)} &middot; {order.place}</span>
                       </div>
                       {order.notes?.trim() && (
-                        <div className="mb-3 text-xs text-stone-500 italic bg-stone-50 rounded-lg px-3 py-2 border border-stone-100">{order.notes.trim()}</div>
+                        <div className="mb-3 text-xs text-stone-500 italic bg-stone-50 rounded-lg px-3 py-2 border border-stone-100 line-clamp-2">{order.notes.trim()}</div>
                       )}
                       <div className="flex gap-2">
                         <button onClick={() => navigate(`/edit/${order.id}`, { state: { returnPath: "/" } })}

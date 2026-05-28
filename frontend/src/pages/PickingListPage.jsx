@@ -46,7 +46,9 @@ const today = new Date().toLocaleDateString('sv', { timeZone: 'Europe/Madrid' })
 
 export default function PickingListPage() {
   const navigate = useNavigate();
-  const [filterDate, setFilterDate] = useState(() => today);
+  const [filterDate, setFilterDate] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem("pick_filters") || "{}").filterDate ?? today; } catch { return today; }
+  });
   const [filterPlace, setFilterPlace] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem("pick_filters") || "{}").filterPlace ?? ""; } catch { return ""; }
   });
@@ -64,7 +66,7 @@ export default function PickingListPage() {
   const pickupTimerRef = useRef(null);
 
   useEffect(() => {
-    sessionStorage.setItem("pick_filters", JSON.stringify({ filterPlace, hideDone }));
+    sessionStorage.setItem("pick_filters", JSON.stringify({ filterDate, filterPlace, hideDone }));
   }, [filterDate, filterPlace, hideDone]);
 
   useEffect(() => {
@@ -155,9 +157,7 @@ export default function PickingListPage() {
         body: JSON.stringify({ status: "picked_up" }),
       })
     ))
-      .then(() => setOrders(prev => prev.map(o =>
-        orderIds.includes(o.id) ? { ...o, status: "picked_up" } : o
-      )))
+      .then(() => setOrders(prev => prev.filter(o => !orderIds.includes(o.id))))
       .catch(() => setError("Error en guardar."));
   };
 
