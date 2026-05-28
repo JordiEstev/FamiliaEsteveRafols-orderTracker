@@ -365,7 +365,7 @@ export default function PickingListPage() {
 
             return (
               <div key={customer} className={"picking-card " + (done ? "picking-card-done" : "")}>
-                <div className="picking-customer-header" onClick={() => toggleCustomer(customer)}>
+                <div className="picking-customer-header" onClick={() => !allPickedUp && toggleCustomer(customer)} style={allPickedUp ? { cursor: "default" } : {}}>
                   <div className={"picking-checkbox picking-checkbox-lg " +
                     (done ? "picking-checkbox-checked" : partiallyDone ? "picking-checkbox-partial" : "")
                   }>
@@ -395,12 +395,14 @@ export default function PickingListPage() {
                   {custOrders.map(order =>
                     order.fruits.map((fruit, idx) => {
                       const key = itemKey(order.id, idx);
-                      const isChecked = checked.has(key);
+                      const frozenByBackend = order.status === "picked_up";
+                      const isChecked = checked.has(key) || frozenByBackend;
                       return (
                         <div
                           key={key}
                           className={"picking-item " + (isChecked ? "picking-item-done" : "")}
-                          onClick={() => toggleItem(key)}
+                          onClick={() => !frozenByBackend && toggleItem(key)}
+                          style={frozenByBackend ? { cursor: "default" } : {}}
                         >
                           <div className={"picking-checkbox " + (isChecked ? "picking-checkbox-checked" : "")}>
                             {isChecked && <span className="picking-check-icon">&#10003;</span>}
