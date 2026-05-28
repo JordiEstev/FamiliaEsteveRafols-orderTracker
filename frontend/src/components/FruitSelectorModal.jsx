@@ -2,21 +2,38 @@ import { useState } from "react";
 import { v4 as uuid } from "uuid";
 
 const FRUIT_TYPES = [
-  { key: "pressec_groc", label: "Pressec Groc", emoji: "🍑", group: "pressec" },
+  { key: "pressec_groc",     label: "Pressec Groc",     emoji: "🍑", group: "pressec" },
   { key: "pressec_barrejat", label: "Pressec Barrejat", emoji: "🍑", group: "pressec" },
-  { key: "pressec_vermell", label: "Pressec Vermell", emoji: "🍑", group: "pressec" },
-  { key: "albercoc", label: "Albercoc", emoji: "🟠" },
-  { key: "cirera", label: "Cirera", emoji: "🍒" },
-  { key: "melo", label: "Meló", emoji: "🍈" },
-  { key: "sindria", label: "Síndria", emoji: "🍉" },
+  { key: "pressec_vermell",  label: "Pressec Vermell",  emoji: "🍑", group: "pressec" },
+  { key: "albercoc",         label: "Albercoc",         emoji: "🟠" },
+  { key: "cirera",           label: "Cirera",           emoji: "🍒" },
+  { key: "melo",             label: "Meló",             emoji: "🍈" },
+  { key: "sindria",          label: "Síndria",          emoji: "🍉" },
 ];
 
 const PEACH_SIZES = [15, 16, 18, 20, 22, 24, 26];
 
-export default function FruitSelectorModal({ open, onClose, onAdd }) {
-  const [step, setStep] = useState("grid"); // grid | form
-  const [selection, setSelection] = useState(null);
-  const [form, setForm] = useState({});
+function initFormFromItem(item) {
+  if (!item) return {};
+  if (item.fruit?.startsWith("pressec")) return { size: item.size ?? 15, qty: item.qty ?? 1 };
+  if (["albercoc", "cirera"].includes(item.fruit)) return { weight: item.weight ?? 1, qty: item.qty ?? 1 };
+  return { qty: item.qty ?? 1, weight: item.weight ?? "" };
+}
+
+/**
+ * editItem: null (add mode) | fruit item object (edit mode)
+ * When editItem is provided, the modal starts in "form" step with values pre-filled.
+ * The `key` prop on the parent call should change when switching between add/edit
+ * to force a fresh mount and correct lazy initialisation.
+ */
+export default function FruitSelectorModal({ open, onClose, onAdd, editItem = null }) {
+  const isEditing = Boolean(editItem);
+
+  const [step, setStep] = useState(() => isEditing ? "form" : "grid");
+  const [selection, setSelection] = useState(() =>
+    isEditing ? (FRUIT_TYPES.find(f => f.key === editItem.fruit) || null) : null
+  );
+  const [form, setForm] = useState(() => initFormFromItem(editItem));
 
   if (!open) return null;
 
@@ -31,10 +48,9 @@ export default function FruitSelectorModal({ open, onClose, onAdd }) {
     if (f.group === "pressec") {
       setForm({ size: 15, qty: 1 });
     } else if (["albercoc", "cirera"].includes(f.key)) {
-      setForm({ weight: 1, qty: 1 });     // weight = per-unit (1 or 2)
+      setForm({ weight: 1, qty: 1 });
     } else {
-      // melo / sindria
-      setForm({ qty: 1, weight: "" });    // weight = total optional
+      setForm({ qty: 1, weight: "" });
     }
     setStep("form");
   };
@@ -47,36 +63,19 @@ export default function FruitSelectorModal({ open, onClose, onAdd }) {
   const setQty = (v) =>
     setForm(prev => ({ ...prev, qty: Math.max(1, Number(v) || 1) }));
 
-  const inc = () => setQty((form.qty || 1) + 1);
-  const dec = () => setQty((form.qty || 1) - 1);
-
-  const handleAdd = () => {
+  const handleSave = () => {
     if (!selection) return;
     let item;
     if (selection.group === "pressec") {
-      item = {
-        id: uuid(),
-        fruit: selection.key,        // pressec_groc / pressec_vermell
-        size: Number(form.size),
-        qty: Number(form.qty),
-        weight: null
-      };
+      item = { id: uuid(), fruit: selection.key, size: Number(form.size), qty: Number(form.qty), weight: null };
     } else if (["albercoc", "cirera"].includes(selection.key)) {
-      item = {
-        id: uuid(),
-        fruit: selection.key,
-        qty: Number(form.qty),
-        weight: Number(form.weight)   // 1 or 2
-      };
+      item = { id: uuid(), fruit: selection.key, qty: Number(form.qty), weight: Number(form.weight) };
     } else {
-      // melo / sindria
       item = {
         id: uuid(),
         fruit: selection.key,
         qty: Number(form.qty),
-        weight: form.weight !== "" && form.weight !== null
-          ? Number(form.weight)
-          : null // optional
+        weight: form.weight !== "" && form.weight !== null ? Number(form.weight) : null,
       };
     }
     onAdd(item);
@@ -87,12 +86,15 @@ export default function FruitSelectorModal({ open, onClose, onAdd }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-2xl bg-stone-900 border border-stone-700 p-5 shadow-2xl">
+
+        {/* Header */}
         <div className="flex justify-between items-center mb-5">
           <h3 className="text-base font-bold text-gray-100">
             {step === "grid" ? "Selecciona fruita" : (
               <span className="flex items-center gap-2">
                 <span>{selection?.emoji}</span>
                 <span>{selection?.label}</span>
+                {isEditing && <span className="text-xs text-amber-400 font-normal ml-1">· Editant</span>}
               </span>
             )}
           </h3>
@@ -104,6 +106,7 @@ export default function FruitSelectorModal({ open, onClose, onAdd }) {
           </button>
         </div>
 
+        {/* Fruit grid */}
         {step === "grid" && (
           <div className="grid grid-cols-2 gap-2.5">
             {FRUIT_TYPES.map(f => (
@@ -119,6 +122,7 @@ export default function FruitSelectorModal({ open, onClose, onAdd }) {
           </div>
         )}
 
+        {/* Form */}
         {step === "form" && selection && (
           <div className="space-y-5">
 
@@ -196,18 +200,18 @@ export default function FruitSelectorModal({ open, onClose, onAdd }) {
             <div className="flex gap-2 pt-1">
               <button
                 type="button"
-                onClick={handleAdd}
+                onClick={handleSave}
                 className="flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold text-stone-900 transition-all"
                 style={{ backgroundColor: "#F59E0B" }}
               >
-                Afegir
+                {isEditing ? "Actualitzar" : "Afegir"}
               </button>
               <button
                 type="button"
-                onClick={() => setStep("grid")}
+                onClick={() => isEditing ? (reset(), onClose()) : setStep("grid")}
                 className="flex-1 rounded-xl bg-stone-700 px-4 py-2.5 text-sm font-medium text-stone-200 hover:bg-stone-600 transition-colors"
               >
-                &larr; Tornar
+                {isEditing ? "Cancel·lar" : "← Tornar"}
               </button>
             </div>
           </div>

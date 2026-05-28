@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Printer, CheckCheck, RotateCcw, Plus } from "lucide-react";
 import { renderFruitLabel, renderFruitDetails, PLACES } from "../utils/fruit";
+import PickupToast from "../components/PickupToast";
 import "./PickingListPage.css";
 
 const FRUIT_EMOJI = {
@@ -15,18 +16,18 @@ const FRUIT_EMOJI = {
 };
 
 function addDays(dateStr, n) {
-  const d = new Date(dateStr);
-  d.setDate(d.getDate() + n);
-  return d.toISOString().split("T")[0];
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const result = new Date(Date.UTC(y, m - 1, d + n));
+  return `${result.getUTCFullYear()}-${String(result.getUTCMonth()+1).padStart(2,'0')}-${String(result.getUTCDate()).padStart(2,'0')}`;
 }
 
 const DIES = ["Diumenge","Dilluns","Dimarts","Dimecres","Dijous","Divendres","Dissabte"];
 
 function getDateLabel(dateStr) {
   if (!dateStr) return "Totes les dates";
-  const t  = new Date().toISOString().split("T")[0];
-  const tm = new Date(Date.now() + 86400000).toISOString().split("T")[0];
-  const yd = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+  const t  = new Date().toLocaleDateString('sv', { timeZone: 'Europe/Madrid' });
+  const tm = addDays(t, 1);
+  const yd = addDays(t, -1);
   if (dateStr === t)  return "Avui";
   if (dateStr === tm) return "Demà";
   if (dateStr === yd) return "Ahir";
@@ -36,7 +37,8 @@ function getDateLabel(dateStr) {
 }
 
 function formatDate(dateStr) {
-  const [y, m, d] = dateStr.split("-");
+  if (!dateStr) return "";
+  const [, m, d] = dateStr.split("-");
   return `${d}/${m}`;
 }
 
@@ -50,13 +52,16 @@ export default function PickingListPage() {
   });
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError]   = useState("");
   const [checked, setChecked] = useState(new Set());
   const [hideDone, setHideDone] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem("pick_filters") || "{}").hideDone ?? false; } catch { return false; }
   });
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState("");
+
+  // Pickup-undo toast
+  const [pendingPickup, setPendingPickup] = useState(null);
+  const pickupTimerRef = useRef(null);
 
   useEffect(() => {
     sessionStorage.setItem("pick_filters", JSON.stringify({ filterPlace, hideDone }));
@@ -77,16 +82,19 @@ export default function PickingListPage() {
       .catch(() => { setError("Error carregant comandes."); setLoading(false); });
   }, [filterDate, filterPlace]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => { if (pickupTimerRef.current) clearTimeout(pickupTimerRef.current); };
+  }, []);
+
+  // ── Grouping & derived state ───────────────────────────────────────────────
+
   const grouped = {};
   for (const order of orders) {
     if (!grouped[order.customer]) grouped[order.customer] = [];
     grouped[order.customer].push(order);
   }
   const customers = Object.keys(grouped).sort();
-
-  const visibleCustomers = hideDone
-    ? customers.filter(c => !grouped[c].every(o => o.status === "picked_up"))
-    : customers;
 
   const itemKey = (orderId, idx) => `${orderId}-${idx}`;
 
@@ -99,6 +107,15 @@ export default function PickingListPage() {
     const keys = allKeysForCustomer(cust);
     return keys.length > 0 && keys.every(k => checked.has(k));
   }, [checked, grouped]);
+
+  const visibleCustomers = hideDone
+    ? customers.filter(c => {
+        const allPickedUp = grouped[c].every(o => o.status === "picked_up");
+        return !isCustomerDone(c) && !allPickedUp;
+      })
+    : customers;
+
+  // ── Checkbox toggles ───────────────────────────────────────────────────────
 
   const toggleItem = (key) => {
     setChecked(prev => {
@@ -128,41 +145,90 @@ export default function PickingListPage() {
     });
   };
 
-  const applyPickups = async () => {
+  // ── Pickup with undo toast ─────────────────────────────────────────────────
+
+  const confirmPickupApi = (orderIds) => {
+    Promise.all(orderIds.map(id =>
+      fetch(`${import.meta.env.VITE_API_URL}/orders/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "picked_up" }),
+      })
+    ))
+      .then(() => setOrders(prev => prev.map(o =>
+        orderIds.includes(o.id) ? { ...o, status: "picked_up" } : o
+      )))
+      .catch(() => setError("Error en guardar."));
+  };
+
+  const applyPickups = () => {
     const orderIds = [];
+    const customerNames = [];
     for (const cust of customers) {
       if (!isCustomerDone(cust)) continue;
+      customerNames.push(cust);
       for (const order of grouped[cust]) {
         if (order.status !== "picked_up") orderIds.push(order.id);
       }
     }
     if (!orderIds.length) return;
-    setSaving(true);
-    try {
-      await Promise.all(orderIds.map(id =>
-        fetch(`${import.meta.env.VITE_API_URL}/orders/${id}/status`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "picked_up" }),
-        })
-      ));
-      setOrders(prev => prev.map(o =>
-        orderIds.includes(o.id) ? { ...o, status: "picked_up" } : o
-      ));
-      setSaveMsg(`${orderIds.length} comanda${orderIds.length > 1 ? "es" : ""} marcada${orderIds.length > 1 ? "es" : ""} com a recollides`);
-      setTimeout(() => setSaveMsg(""), 3000);
-    } catch {
-      setSaveMsg("Error en guardar.");
-    } finally {
-      setSaving(false);
-    }
+
+    // Replace any existing pending confirm
+    if (pickupTimerRef.current) clearTimeout(pickupTimerRef.current);
+
+    pickupTimerRef.current = setTimeout(() => {
+      confirmPickupApi(orderIds);
+      setPendingPickup(null);
+      pickupTimerRef.current = null;
+    }, 5000);
+
+    const singleCustomer = customerNames.length === 1 ? customerNames[0] : null;
+    const firstCustOrders = singleCustomer ? (grouped[singleCustomer] || []) : [];
+
+    setPendingPickup({
+      id: Date.now(),
+      orderIds,
+      customerName: singleCustomer,
+      message: customerNames.length === 1
+        ? "Marcat com a recollit"
+        : `${customerNames.length} clients marcats com a recollits`,
+      firstCustPlace: firstCustOrders[0]?.place || filterPlace,
+      firstCustDate:  firstCustOrders[0]?.date  || filterDate,
+    });
+  };
+
+  const handleUndoPickup = () => {
+    clearTimeout(pickupTimerRef.current);
+    pickupTimerRef.current = null;
+    setPendingPickup(null);
+  };
+
+  const handleNewOrderSameName = () => {
+    clearTimeout(pickupTimerRef.current);
+    pickupTimerRef.current = null;
+    if (!pendingPickup) return;
+    confirmPickupApi(pendingPickup.orderIds);
+    const { customerName, firstCustPlace, firstCustDate } = pendingPickup;
+    setPendingPickup(null);
+    navigate('/add', {
+      state: {
+        prefillCustomer: customerName,
+        prefillPlace:    firstCustPlace,
+        prefillDate:     firstCustDate,
+        returnPath:      '/picking',
+      },
+    });
   };
 
   const handleNewOrder = () => {
     navigate("/add", { state: { prefillPlace: filterPlace, prefillDate: filterDate, returnPath: "/picking" } });
   };
 
-  const checkedCount = visibleCustomers.filter(c => isCustomerDone(c)).length;
+  // ── Derived counts ──────────────────────────────────────────────────────────
+
+  const checkedCount = visibleCustomers.filter(c =>
+    isCustomerDone(c) || grouped[c].every(o => o.status === "picked_up")
+  ).length;
   const totalCount = visibleCustomers.length;
 
   const printTitle = [
@@ -170,6 +236,8 @@ export default function PickingListPage() {
     filterPlace || null,
     filterDate ? getDateLabel(filterDate) : null,
   ].filter(Boolean).join(" · ");
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="picking-root">
@@ -248,21 +316,6 @@ export default function PickingListPage() {
         ))}
       </div>
 
-      {/* ── Nova Comanda (inline row, only visible if no place selected) ── */}
-      {!filterPlace && (
-        <div className="no-print picking-new-order-row">
-          <button onClick={handleNewOrder} className="picking-new-order-btn">
-            <Plus className="w-4 h-4" />
-            Nova comanda
-          </button>
-        </div>
-      )}
-
-      {/* ── Save message ── */}
-      {saveMsg && (
-        <div className="no-print picking-save-msg">{saveMsg}</div>
-      )}
-
       {/* ── Print header ── */}
       <div className="print-only picking-print-header">
         <strong>{printTitle}</strong>
@@ -278,6 +331,13 @@ export default function PickingListPage() {
         <Plus className="w-7 h-7" />
       </button>
 
+      {/* ── Pickup undo toast ── */}
+      <PickupToast
+        pending={pendingPickup}
+        onUndo={handleUndoPickup}
+        onNewOrder={pendingPickup?.customerName ? handleNewOrderSameName : null}
+      />
+
       {/* ── Content ── */}
       <div className="picking-content" style={{ paddingBottom: '5rem' }}>
         {loading ? (
@@ -292,7 +352,8 @@ export default function PickingListPage() {
         ) : (
           visibleCustomers.map(customer => {
             const custOrders = grouped[customer];
-            const done = isCustomerDone(customer);
+            const allPickedUp = custOrders.every(o => o.status === "picked_up");
+            const done = isCustomerDone(customer) || allPickedUp;
             const allKeys = allKeysForCustomer(customer);
             const checkedKeys = allKeys.filter(k => checked.has(k));
             const partiallyDone = checkedKeys.length > 0 && !done;
@@ -312,16 +373,16 @@ export default function PickingListPage() {
                       {[...new Set(custOrders.map(o => o.place))].join(" · ")}
                       {" · "}
                       {formatDate(custOrders[0].date)}
-                      {custOrders.some(o => o.status === "picked_up") && (
+                      {allPickedUp && (
                         <span className="picking-status-tag">Recollit</span>
                       )}
-                      {custOrders.some(o => o.status === "ready") && !custOrders.some(o => o.status === "picked_up") && (
+                      {custOrders.some(o => o.status === "ready") && !allPickedUp && (
                         <span className="picking-status-tag picking-status-ready">Preparat</span>
                       )}
                     </span>
                   </div>
                   <span className="picking-item-count no-print">
-                    {checkedKeys.length}/{allKeys.length}
+                    {done ? allKeys.length : checkedKeys.length}/{allKeys.length}
                   </span>
                 </div>
 
@@ -329,7 +390,7 @@ export default function PickingListPage() {
                   {custOrders.map(order =>
                     order.fruits.map((fruit, idx) => {
                       const key = itemKey(order.id, idx);
-                      const isChecked = checked.has(key);
+                      const isChecked = checked.has(key) || order.status === "picked_up";
                       return (
                         <div
                           key={key}

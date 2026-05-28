@@ -2,8 +2,9 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, Package, Pencil, Trash2, Sheet, ClockArrowDown, ClockArrowUp,
-  ClipboardList, ChevronDown, Copy, Check, ArrowUp, RotateCcw,
+  ClipboardList, ChevronDown, Copy, Check, ArrowUp,
 } from "lucide-react";
+import PickupToast from "../components/PickupToast";
 import * as XLSX from 'xlsx';
 import './OrderListPage.css';
 import { motion, AnimatePresence } from "framer-motion";
@@ -208,7 +209,7 @@ function OrderListPage() {
       pickupTimerRef.current = null;
     }, 5000);
 
-    setPendingPickup({ orderId: order.id, customerName: order.customer, place: order.place, date: order.date });
+    setPendingPickup({ id: order.id, orderId: order.id, customerName: order.customer, place: order.place, date: order.date });
   };
 
   const handleUndoPickup = () => {
@@ -955,52 +956,12 @@ function OrderListPage() {
         )}
       </AnimatePresence>
 
-      {/* ── Pickup undo toast (mini bottom sheet) ── */}
-      <AnimatePresence>
-        {pendingPickup && (
-          <motion.div
-            key="pickup-toast"
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", stiffness: 300, damping: 32 }}
-            className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-2xl shadow-2xl overflow-hidden"
-          >
-            {/* Progress bar countdown */}
-            <div className="relative h-1.5 bg-stone-100 w-full">
-              <motion.div
-                key={pendingPickup.orderId}
-                className="absolute inset-0 bg-emerald-400"
-                style={{ transformOrigin: "left" }}
-                initial={{ scaleX: 1 }}
-                animate={{ scaleX: 0 }}
-                transition={{ duration: 5, ease: "linear" }}
-              />
-            </div>
-            {/* Content */}
-            <div className="px-5 pt-4 pb-8">
-              <div className="flex items-center gap-2 mb-0.5">
-                <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                <span className="font-bold text-stone-900">Marcat com a recollit</span>
-              </div>
-              <p className="text-sm text-stone-500 mb-4 ml-6">{pendingPickup.customerName}</p>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleUndoPickup}
-                  className="flex-1 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold text-sm flex items-center justify-center gap-1.5 transition-colors">
-                  <RotateCcw className="w-4 h-4" /> Desfer
-                </button>
-                <button
-                  onClick={handleNewOrderSameName}
-                  className="flex-1 py-2.5 rounded-xl text-stone-900 font-semibold text-sm flex items-center justify-center gap-1.5 transition-colors"
-                  style={{ backgroundColor: "#F59E0B" }}>
-                  <Plus className="w-4 h-4" /> Nova comanda
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* ── Pickup undo toast ── */}
+      <PickupToast
+        pending={pendingPickup}
+        onUndo={handleUndoPickup}
+        onNewOrder={handleNewOrderSameName}
+      />
 
       {/* ── FAB: scroll to top ── */}
       <AnimatePresence>

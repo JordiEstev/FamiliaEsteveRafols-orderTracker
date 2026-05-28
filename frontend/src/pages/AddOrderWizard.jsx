@@ -23,18 +23,28 @@ const FRUIT_EMOJI = {
 const STEP_LABELS = ["Client", "Lloc", "Data", "Fruita", "Resum"];
 const TOTAL_STEPS = 5;
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers (timezone-safe, always uses Europe/Madrid) ────────────────────────
 
-function getNextWeekday(targetDay) {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  const diff = (targetDay - d.getDay() + 7) % 7;
-  d.setDate(d.getDate() + diff);
-  return d.toISOString().split("T")[0];
+function getMadridDateStr(offsetDays = 0) {
+  const base = new Date().toLocaleDateString('sv', { timeZone: 'Europe/Madrid' });
+  if (offsetDays === 0) return base;
+  const [y, m, d] = base.split('-').map(Number);
+  const r = new Date(Date.UTC(y, m - 1, d + offsetDays));
+  return `${r.getUTCFullYear()}-${String(r.getUTCMonth()+1).padStart(2,'0')}-${String(r.getUTCDate()).padStart(2,'0')}`;
 }
 
-function todayStr()    { return new Date().toISOString().split("T")[0]; }
-function tomorrowStr() { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split("T")[0]; }
+function getNextWeekday(targetDay) {
+  const base = new Date().toLocaleDateString('sv', { timeZone: 'Europe/Madrid' });
+  const [y, m, d] = base.split('-').map(Number);
+  const todayUTC = new Date(Date.UTC(y, m - 1, d));
+  const todayDow = todayUTC.getUTCDay();
+  const diff = (targetDay - todayDow + 7) % 7 || 7; // minimum 1 day (next occurrence)
+  const r = new Date(Date.UTC(y, m - 1, d + diff));
+  return `${r.getUTCFullYear()}-${String(r.getUTCMonth()+1).padStart(2,'0')}-${String(r.getUTCDate()).padStart(2,'0')}`;
+}
+
+function todayStr()    { return getMadridDateStr(0); }
+function tomorrowStr() { return getMadridDateStr(1); }
 
 function ddmm(dateStr) {
   if (!dateStr) return "";
@@ -80,8 +90,9 @@ export default function AddOrderWizard() {
   });
   const [customerError, setCustomerError] = useState("");
   const [showOtherDate, setShowOtherDate] = useState(false);
-  const [openFruitModal, setOpenFruitModal] = useState(false);
-  const [savedOrder, setSavedOrder] = useState(null);
+  const [openFruitModal, setOpenFruitModal]   = useState(false);
+  const [editingFruit, setEditingFruit]       = useState(null);
+  const [savedOrder, setSavedOrder]           = useState(null);
   const [saving,    setSaving]    = useState(false);
   const [saveError, setSaveError] = useState("");
 
@@ -155,8 +166,23 @@ export default function AddOrderWizard() {
     }
   };
 
-  const addFruit    = (item) => setOrder(prev => ({ ...prev, fruits: [...prev.fruits, item] }));
-  const removeFruit = (id)   => setOrder(prev => ({ ...prev, fruits: prev.fruits.filter(f => f.id !== id) }));
+  const removeFruit = (id) => setOrder(prev => ({ ...prev, fruits: prev.fruits.filter(f => f.id !== id) }));
+
+  const handleOpenAddFruit = () => { setEditingFruit(null); setOpenFruitModal(true); };
+  const handleOpenEditFruit = (item) => { setEditingFruit(item); setOpenFruitModal(true); };
+  const handleModalClose = () => { setOpenFruitModal(false); setEditingFruit(null); };
+
+  const handleFruitSave = (item) => {
+    if (editingFruit) {
+      setOrder(prev => ({
+        ...prev,
+        fruits: prev.fruits.map(f => f.id === editingFruit.id ? { ...item, id: editingFruit.id } : f),
+      }));
+    } else {
+      setOrder(prev => ({ ...prev, fruits: [...prev.fruits, item] }));
+    }
+    setEditingFruit(null);
+  };
 
   const handleSubmit = async () => {
     setSaving(true);
@@ -465,6 +491,13 @@ export default function AddOrderWizard() {
                             <div className="text-xs text-stone-400 mt-0.5">{renderFruitDetails(item)}</div>
                           </div>
                           <button
+                            onClick={() => handleOpenEditFruit(item)}
+                            className="w-8 h-8 flex items-center justify-center rounded-xl text-amber-400 hover:bg-stone-700 transition-colors"
+                            title="Editar"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
                             onClick={() => removeFruit(item.id)}
                             className="w-8 h-8 flex items-center justify-center rounded-xl text-stone-500 hover:text-red-400 hover:bg-stone-700 transition-colors text-lg leading-none"
                           >
@@ -476,7 +509,7 @@ export default function AddOrderWizard() {
                   )}
 
                   <button
-                    onClick={() => setOpenFruitModal(true)}
+                    onClick={handleOpenAddFruit}
                     className="w-full rounded-2xl border border-stone-700 bg-stone-800 py-3.5 font-semibold text-stone-300 flex items-center justify-center gap-2 hover:bg-stone-700 transition-colors mb-4"
                   >
                     <PlusIcon className="w-4 h-4" /> Afegir fruita
@@ -582,9 +615,11 @@ export default function AddOrderWizard() {
       </div>
 
       <FruitSelectorModal
+        key={editingFruit ? `edit-${editingFruit.id}` : 'new'}
         open={openFruitModal}
-        onClose={() => setOpenFruitModal(false)}
-        onAdd={addFruit}
+        onClose={handleModalClose}
+        onAdd={handleFruitSave}
+        editItem={editingFruit}
       />
     </div>
   );
