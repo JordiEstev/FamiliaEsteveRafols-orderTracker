@@ -157,7 +157,9 @@ export default function PickingListPage() {
         body: JSON.stringify({ status: "picked_up" }),
       })
     ))
-      .then(() => setOrders(prev => prev.filter(o => !orderIds.includes(o.id))))
+      .then(() => setOrders(prev => prev.map(o =>
+        orderIds.includes(o.id) ? { ...o, status: "picked_up" } : o
+      )))
       .catch(() => setError("Error en guardar."));
   };
 
@@ -390,7 +392,7 @@ export default function PickingListPage() {
                   {custOrders.map(order =>
                     order.fruits.map((fruit, idx) => {
                       const key = itemKey(order.id, idx);
-                      const isChecked = checked.has(key) || order.status === "picked_up";
+                      const isChecked = checked.has(key);
                       return (
                         <div
                           key={key}
