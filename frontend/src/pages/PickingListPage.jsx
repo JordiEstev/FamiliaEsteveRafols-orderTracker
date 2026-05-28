@@ -392,7 +392,7 @@ export default function PickingListPage() {
                   {custOrders.map(order =>
                     order.fruits.map((fruit, idx) => {
                       const key = itemKey(order.id, idx);
-                      const isChecked = checked.has(key);
+                      const isChecked = checked.has(key) || order.status === "picked_up";
                       return (
                         <div
                           key={key}
