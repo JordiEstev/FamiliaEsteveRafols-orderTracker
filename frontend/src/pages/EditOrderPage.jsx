@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Pencil, ArrowLeft } from "lucide-react";
+import { v4 as uuid } from "uuid";
 import FruitSelectorModal from "../components/FruitSelectorModal";
 import { PLACES, renderFruitLabel, renderFruitDetails } from "../utils/fruit";
 
@@ -38,6 +39,7 @@ export default function EditOrderPage() {
   const [fruits, setFruits]           = useState([]);
   const [loading, setLoading]         = useState(true);
   const [openFruitModal, setOpenFruitModal] = useState(false);
+  const [editingFruit, setEditingFruit]     = useState(null);
   const [errorMessage, setErrorMessage]     = useState("");
   const [savedOrder, setSavedOrder]         = useState(null);
   const [saving, setSaving]                 = useState(false);
@@ -56,7 +58,7 @@ export default function EditOrderPage() {
           notes:    order.notes || "",
           status:   order.status || "pending",
         });
-        setFruits(order.fruits);
+        setFruits(order.fruits.map(f => ({ ...f, id: f.id ?? uuid() })));
         setLoading(false);
       })
       .catch(() => {
@@ -92,8 +94,17 @@ export default function EditOrderPage() {
       .finally(() => setSaving(false));
   };
 
-  const addFruit    = (item) => setFruits(prev => [...prev, item]);
-  const removeFruit = (fid)  => setFruits(prev => prev.filter(f => f.id !== fid));
+  const handleFruitSave = (item) => {
+    if (editingFruit) {
+      setFruits(prev => prev.map(f => f.id === editingFruit.id ? { ...item, id: editingFruit.id } : f));
+    } else {
+      setFruits(prev => [...prev, item]);
+    }
+    setEditingFruit(null);
+  };
+  const handleModalClose = () => { setOpenFruitModal(false); setEditingFruit(null); };
+  const handleOpenEditFruit = (item) => { setEditingFruit(item); setOpenFruitModal(true); };
+  const removeFruit = (fid) => setFruits(prev => prev.filter(f => f.id !== fid));
 
   // ── Loading ──────────────────────────────────────────────────────────────
 
@@ -288,6 +299,13 @@ export default function EditOrderPage() {
                 </div>
                 <button
                   type="button"
+                  onClick={() => handleOpenEditFruit(item)}
+                  className="w-7 h-7 flex items-center justify-center text-stone-400 hover:text-amber-400 transition-colors rounded-lg hover:bg-stone-700"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
                   onClick={() => removeFruit(item.id)}
                   className="w-7 h-7 flex items-center justify-center text-stone-500 hover:text-red-400 transition-colors rounded-lg hover:bg-stone-700 text-base leading-none"
                 >
@@ -299,9 +317,11 @@ export default function EditOrderPage() {
         </div>
 
         <FruitSelectorModal
+          key={editingFruit ? `edit-${editingFruit.id}` : "new"}
           open={openFruitModal}
-          onClose={() => setOpenFruitModal(false)}
-          onAdd={addFruit}
+          onClose={handleModalClose}
+          onAdd={handleFruitSave}
+          editItem={editingFruit}
         />
 
         <div className="pt-2 flex gap-3">

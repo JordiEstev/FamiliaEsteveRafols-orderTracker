@@ -255,7 +255,6 @@ function OrderListPage() {
   // ── Computed data ──────────────────────────────────────────────────────────
 
   const filteredOrders = orders
-    .filter(order => !order._pendingPickup)
     .filter(order => {
       const matchesName  = order.customer.toLowerCase().includes(search.toLowerCase());
       const matchesDate  = filterDate === "" || order.date === filterDate;
