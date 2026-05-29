@@ -484,7 +484,11 @@ function OrderListPage() {
               <Package className="w-5 h-5" style={{ color: "#F59E0B" }} />
             </button>
             <button
-              onClick={() => window.print()}
+              onClick={() => {
+                window.addEventListener('afterprint', () => { document.title = 'Comandes'; }, { once: true });
+                document.title = ' ';
+                window.print();
+              }}
               className="p-2.5 rounded-xl hover:bg-stone-50 transition-colors"
               title="Imprimir">
               <Printer className="w-5 h-5 text-stone-400" />
@@ -632,8 +636,8 @@ function OrderListPage() {
                         <span className="order-card-date text-xs text-stone-400 whitespace-nowrap mt-0.5 shrink-0">{formatFullDate(order.created_at)}</span>
                       </div>
                       <div className="order-card-fruits space-y-0.5 mb-2">
-                        {order.fruits.map((fruit, idx) => (
-                          <div key={idx} className="order-card-fruit-item text-sm text-stone-600 truncate">{renderFruitDetails(fruit)}</div>
+                        {groupedFruits(order.fruits).map(({ key, text }) => (
+                          <div key={key} className="order-card-fruit-item text-sm text-stone-600 truncate">{text}</div>
                         ))}
                       </div>
                       <div className="order-card-meta flex items-center gap-2 mb-3 flex-wrap">
@@ -1006,25 +1010,42 @@ function OrderListPage() {
   );
 }
 
-// ── Fruit detail renderer (for order cards) ──────────────────────────────────
+// ── Fruit renderers (for order cards) ────────────────────────────────────────
 
-function renderFruitDetails(item) {
+function fruitTypeLabel(fruitKey) {
+  if (fruitKey.startsWith("pressec_")) {
+    const v = fruitKey.split("_")[1];
+    return `Pressec ${v.charAt(0).toUpperCase() + v.slice(1)}`;
+  }
+  return { albercoc: "Albercoc", cirera: "Cirera", melo: "Meló", sindria: "Síndria" }[fruitKey] || fruitKey;
+}
+
+function fruitItemDetail(item) {
   if (item.fruit.startsWith("pressec_")) {
-    const variant = item.fruit.split("_")[1];
-    const label = item.qty === 1 ? "caixa" : "caixes";
-    return `Pressec ${variant}: ${item.qty} ${label} cal.${item.size}`;
+    return `${item.qty} ${item.qty === 1 ? "caixa" : "caixes"} cal.${item.size}`;
   }
-  if (item.fruit === "albercoc") {
-    const label = item.qty > 1 ? (item.weight === 1 ? "Tarrines" : "Caixes") : (item.weight === 1 ? "Tarrina" : "Caixa");
-    return `Albercoc: ${item.qty} ${label} (${item.weight}kg)`;
+  if (item.fruit === "albercoc" || item.fruit === "cirera") {
+    const s = item.weight === 1 ? "Tarrina" : "Caixa";
+    const p = item.weight === 1 ? "Tarrines" : "Caixes";
+    return `${item.qty} ${item.qty > 1 ? p : s} (${item.weight}kg)`;
   }
-  if (item.fruit === "cirera") {
-    const label = item.qty > 1 ? (item.weight === 1 ? "Tarrines" : "Caixes") : (item.weight === 1 ? "Tarrina" : "Caixa");
-    return `Cirera: ${item.qty} ${label} (${item.weight}kg)`;
+  if (item.fruit === "melo" || item.fruit === "sindria") {
+    return `${item.qty} ${item.qty === 1 ? "peça" : "peces"}${item.weight ? ` · ${item.weight} kg` : ""}`;
   }
-  if (item.fruit === "melo")    return `Melo: ${item.qty} peces${item.weight ? ` - ${item.weight} kg` : ""}`;
-  if (item.fruit === "sindria") return `Sindria: ${item.qty} peces${item.weight ? ` - ${item.weight} kg` : ""}`;
-  return `${capitalize(item.fruit)}: ${item.qty}`;
+  return `${item.qty}`;
+}
+
+function groupedFruits(fruits) {
+  const order = [];
+  const groups = {};
+  for (const f of fruits) {
+    if (!groups[f.fruit]) { groups[f.fruit] = []; order.push(f.fruit); }
+    groups[f.fruit].push(f);
+  }
+  return order.map(key => ({
+    key,
+    text: `${fruitTypeLabel(key)}: ${groups[key].map(fruitItemDetail).join(', ')}`,
+  }));
 }
 
 // ── Print-only fruit summary ──────────────────────────────────────────────────
