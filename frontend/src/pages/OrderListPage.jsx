@@ -44,6 +44,13 @@ function getDateLabelFull(dateStr) {
   return `${DIES[date.getDay()]} ${parseInt(d)} de ${MESOS[parseInt(m) - 1].toLowerCase()}${yearSuffix}`;
 }
 
+function getDateLabelPrint(dateStr) {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.split("-");
+  const date = new Date(dateStr + "T00:00:00");
+  return `${DIES[date.getDay()]} ${parseInt(d)} de ${MESOS[parseInt(m) - 1]} de ${y}`;
+}
+
 function formatDate(dateStr) {
   if (!dateStr) return "";
   const [y, mm, dd] = dateStr.split("-");
@@ -515,7 +522,7 @@ function OrderListPage() {
 
           {/* ── Print-only document header ── */}
           <div className="order-print-header">
-            📋 Llista de Comandes{filterDate ? ` · ${getDateLabel(filterDate)}` : ""}{filterPlace && filterPlace !== "Tots els llocs" ? ` · ${filterPlace}` : ""}
+            📋 Llista de Comandes{filterDate ? ` · ${getDateLabelPrint(filterDate)}` : ""}{filterPlace && filterPlace !== "Tots els llocs" ? ` · ${filterPlace}` : ""}
           </div>
 
           {/* ── Filter section (non-sticky, gray bg) ── */}
