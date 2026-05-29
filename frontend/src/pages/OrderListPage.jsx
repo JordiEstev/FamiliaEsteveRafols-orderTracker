@@ -506,8 +506,13 @@ function OrderListPage() {
       </nav>
 
       {/* ── Main content ── */}
-      <div className="min-h-screen pt-14" style={{ backgroundColor: "#FAFAF5" }}>
-        <div className="max-w-md mx-auto px-4 pt-3 pb-28">
+      <div className="min-h-screen pt-14 print:pt-0 print:bg-white" style={{ backgroundColor: "#FAFAF5" }}>
+        <div className="max-w-md mx-auto px-4 pt-3 pb-28 print:px-4 print:pt-0 print:pb-0 print:max-w-full">
+
+          {/* ── Print-only document header ── */}
+          <div className="order-print-header">
+            📋 Llista de Comandes{filterDate ? ` · ${getDateLabel(filterDate)}` : ""}{filterPlace && filterPlace !== "Tots els llocs" ? ` · ${filterPlace}` : ""}
+          </div>
 
           {/* ── Filter section (non-sticky, gray bg) ── */}
           <div className="bg-gray-50 rounded-2xl p-3 mb-4 border border-stone-100 space-y-2 print:hidden">
@@ -615,23 +620,23 @@ function OrderListPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.97 }}
                     transition={{ type: "spring", stiffness: 80, damping: 15 }}
-                    className="bg-white rounded-2xl shadow-sm mb-3 overflow-hidden print:shadow-none print:rounded-xl print:break-inside-avoid"
+                    className="order-card bg-white rounded-2xl shadow-sm mb-3 overflow-hidden"
                     style={{ border: "1px solid #F5F5F4", borderLeft: `4px solid ${(STATUS_CONFIG[order.status] || STATUS_CONFIG.pending).color}` }}
                   >
-                    <div className="p-4">
+                    <div className="order-card-inner p-4">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <span className="hidden print:inline-flex w-5 h-5 border-2 border-black rounded flex-shrink-0" />
-                          <span className="font-bold text-stone-900 text-base leading-tight truncate">{order.customer}</span>
+                          <span className="order-card-check" />
+                          <span className="order-card-customer font-bold text-stone-900 text-base leading-tight truncate">{order.customer}</span>
                         </div>
-                        <span className="text-xs text-stone-400 whitespace-nowrap mt-0.5 shrink-0 print:hidden">{formatFullDate(order.created_at)}</span>
+                        <span className="order-card-date text-xs text-stone-400 whitespace-nowrap mt-0.5 shrink-0">{formatFullDate(order.created_at)}</span>
                       </div>
-                      <div className="space-y-0.5 mb-2">
+                      <div className="order-card-fruits space-y-0.5 mb-2">
                         {order.fruits.map((fruit, idx) => (
-                          <div key={idx} className="text-sm text-stone-600 truncate">{renderFruitDetails(fruit)}</div>
+                          <div key={idx} className="order-card-fruit-item text-sm text-stone-600 truncate">{renderFruitDetails(fruit)}</div>
                         ))}
                       </div>
-                      <div className="flex items-center gap-2 mb-3 flex-wrap">
+                      <div className="order-card-meta flex items-center gap-2 mb-3 flex-wrap">
                         {(() => {
                           const s = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
                           return (
@@ -643,9 +648,9 @@ function OrderListPage() {
                         <span className="text-xs text-stone-400">{formatDate(order.date)} &middot; {order.place}</span>
                       </div>
                       {order.notes?.trim() && (
-                        <div className="mb-3 text-xs text-stone-500 italic bg-stone-50 rounded-lg px-3 py-2 border border-stone-100 line-clamp-2">{order.notes.trim()}</div>
+                        <div className="order-card-notes mb-3 text-xs text-stone-500 italic bg-stone-50 rounded-lg px-3 py-2 border border-stone-100 line-clamp-2">{order.notes.trim()}</div>
                       )}
-                      <div className="flex gap-2 print:hidden">
+                      <div className="order-card-actions flex gap-2">
                         <button onClick={() => navigate(`/edit/${order.id}`, { state: { returnPath: "/" } })}
                           className="bg-stone-50 hover:bg-stone-100 text-stone-600 border border-stone-200 px-3 py-2 rounded-xl text-sm flex items-center justify-center gap-1.5 transition-colors font-medium">
                           <Pencil className="w-3.5 h-3.5" />
