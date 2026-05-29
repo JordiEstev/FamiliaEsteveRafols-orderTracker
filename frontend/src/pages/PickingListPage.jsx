@@ -1,19 +1,15 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Printer, CheckCheck, RotateCcw, Plus } from "lucide-react";
+import { ArrowLeft, Plus, X, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { renderFruitLabel, renderFruitDetails, PLACES } from "../utils/fruit";
 import PickupToast from "../components/PickupToast";
-import "./PickingListPage.css";
 
 const FRUIT_EMOJI = {
-  pressec_groc: "🍑",
-  pressec_barrejat: "🍑",
-  pressec_vermell: "🍑",
-  albercoc: "🟠",
-  cirera: "🍒",
-  melo: "🍈",
-  sindria: "🍉",
+  pressec_groc: "🍑", pressec_barrejat: "🍑", pressec_vermell: "🍑",
+  albercoc: "🟠", cirera: "🍒", melo: "🍈", sindria: "🍉",
 };
+
+const DIES = ["Diumenge","Dilluns","Dimarts","Dimecres","Dijous","Divendres","Dissabte"];
 
 function addDays(dateStr, n) {
   const [y, m, d] = dateStr.split("-").map(Number);
@@ -21,47 +17,49 @@ function addDays(dateStr, n) {
   return `${result.getUTCFullYear()}-${String(result.getUTCMonth()+1).padStart(2,'0')}-${String(result.getUTCDate()).padStart(2,'0')}`;
 }
 
-const DIES = ["Diumenge","Dilluns","Dimarts","Dimecres","Dijous","Divendres","Dissabte"];
-
-function getDateLabel(dateStr) {
+function getShortDateLabel(dateStr) {
   if (!dateStr) return "Totes les dates";
-  const t  = new Date().toLocaleDateString('sv', { timeZone: 'Europe/Madrid' });
-  const tm = addDays(t, 1);
-  const yd = addDays(t, -1);
-  if (dateStr === t)  return "Avui";
-  if (dateStr === tm) return "Demà";
-  if (dateStr === yd) return "Ahir";
   const [, m, d] = dateStr.split("-");
   const date = new Date(dateStr + "T00:00:00");
-  return `${DIES[date.getDay()]} ${d}/${m}`;
+  return `${DIES[date.getDay()]} ${parseInt(d)}/${m}`;
 }
 
-function formatDate(dateStr) {
-  if (!dateStr) return "";
-  const [, m, d] = dateStr.split("-");
-  return `${d}/${m}`;
+function getFullDateLabel(dateStr) {
+  if (!dateStr) return "Totes les dates";
+  const t = new Date().toLocaleDateString('sv', { timeZone: 'Europe/Madrid' });
+  const tm = addDays(t, 1);
+  const yd = addDays(t, -1);
+  const short = getShortDateLabel(dateStr);
+  if (dateStr === t)  return `Avui · ${short}`;
+  if (dateStr === tm) return `Demà · ${short}`;
+  if (dateStr === yd) return `Ahir · ${short}`;
+  return short;
 }
 
 const today = new Date().toLocaleDateString('sv', { timeZone: 'Europe/Madrid' });
 
 export default function PickingListPage() {
   const navigate = useNavigate();
+
   const [filterDate, setFilterDate] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem("pick_filters") || "{}").filterDate ?? today; } catch { return today; }
   });
   const [filterPlace, setFilterPlace] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem("pick_filters") || "{}").filterPlace ?? ""; } catch { return ""; }
   });
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState("");
-  const [checked, setChecked] = useState(new Set());
   const [hideDone, setHideDone] = useState(() => {
-    try { return JSON.parse(sessionStorage.getItem("pick_filters") || "{}").hideDone ?? false; } catch { return false; }
+    try {
+      const v = JSON.parse(sessionStorage.getItem("pick_filters") || "{}").hideDone;
+      return v !== undefined ? v : true;
+    } catch { return true; }
   });
-  const [saving, setSaving] = useState(false);
 
-  // Pickup-undo toast
+  const [search, setSearch]             = useState("");
+  const [orders, setOrders]             = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState("");
+  const [showContextModal, setShowContextModal] = useState(false);
+
   const [pendingPickup, setPendingPickup] = useState(null);
   const pickupTimerRef = useRef(null);
 
@@ -71,25 +69,20 @@ export default function PickingListPage() {
 
   useEffect(() => {
     setLoading(true);
-    setChecked(new Set());
     const params = new URLSearchParams();
-    if (filterDate) params.set("date", filterDate);
+    if (filterDate)  params.set("date",  filterDate);
     if (filterPlace) params.set("place", filterPlace);
     fetch(`${import.meta.env.VITE_API_URL}/orders?${params}`)
-      .then(res => { if (!res.ok) throw new Error("error"); return res.json(); })
-      .then(data => {
-        setOrders(data.filter(o => o.status !== "cancelled"));
-        setLoading(false);
-      })
+      .then(res => { if (!res.ok) throw new Error(); return res.json(); })
+      .then(data => { setOrders(data.filter(o => o.status !== "cancelled")); setLoading(false); })
       .catch(() => { setError("Error carregant comandes."); setLoading(false); });
   }, [filterDate, filterPlace]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => { if (pickupTimerRef.current) clearTimeout(pickupTimerRef.current); };
   }, []);
 
-  // ── Grouping & derived state ───────────────────────────────────────────────
+  // ── Grouping ──────────────────────────────────────────────────────────────
 
   const grouped = {};
   for (const order of orders) {
@@ -98,57 +91,21 @@ export default function PickingListPage() {
   }
   const customers = Object.keys(grouped).sort();
 
-  const itemKey = (orderId, idx) => `${orderId}-${idx}`;
+  const visibleCustomers = customers.filter(c => {
+    if (search && !c.toLowerCase().includes(search.toLowerCase())) return false;
+    if (hideDone) {
+      const allPickedUp = grouped[c].every(o => o.status === "picked_up");
+      const hasPending = pendingPickup && grouped[c].some(o => pendingPickup.orderIds?.includes(o.id));
+      return !allPickedUp || hasPending;
+    }
+    return true;
+  });
 
-  const allKeysForCustomer = (cust) =>
-    grouped[cust].flatMap(order =>
-      order.fruits.map((_, idx) => itemKey(order.id, idx))
-    );
+  const totalCount     = customers.length;
+  const deliveredCount = customers.filter(c => grouped[c].every(o => o.status === "picked_up")).length;
+  const progressPct    = totalCount > 0 ? (deliveredCount / totalCount) * 100 : 0;
 
-  const isCustomerDone = useCallback((cust) => {
-    const keys = allKeysForCustomer(cust);
-    return keys.length > 0 && keys.every(k => checked.has(k));
-  }, [checked, grouped]);
-
-  const visibleCustomers = hideDone
-    ? customers.filter(c => {
-        const allPickedUp = grouped[c].every(o => o.status === "picked_up");
-        const hasPendingPickup = pendingPickup && grouped[c].some(o => pendingPickup.orderIds?.includes(o.id));
-        return !allPickedUp || hasPendingPickup;
-      })
-    : customers;
-
-  // ── Checkbox toggles ───────────────────────────────────────────────────────
-
-  const toggleItem = (key) => {
-    setChecked(prev => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
-  };
-
-  const toggleCustomer = (cust) => {
-    const keys = allKeysForCustomer(cust);
-    const done = keys.every(k => checked.has(k));
-    setChecked(prev => {
-      const next = new Set(prev);
-      keys.forEach(k => done ? next.delete(k) : next.add(k));
-      return next;
-    });
-  };
-
-  const toggleAll = () => {
-    const allKeys = visibleCustomers.flatMap(c => allKeysForCustomer(c));
-    const allDone = allKeys.every(k => checked.has(k));
-    setChecked(prev => {
-      const next = new Set(prev);
-      allKeys.forEach(k => allDone ? next.delete(k) : next.add(k));
-      return next;
-    });
-  };
-
-  // ── Pickup with undo toast ─────────────────────────────────────────────────
+  // ── Pickup handlers ───────────────────────────────────────────────────────
 
   const confirmPickupApi = (orderIds) => {
     Promise.all(orderIds.map(id =>
@@ -164,20 +121,16 @@ export default function PickingListPage() {
       .catch(() => setError("Error en guardar."));
   };
 
-  const applyPickups = () => {
-    const orderIds = [];
-    const customerNames = [];
-    for (const cust of customers) {
-      if (!isCustomerDone(cust)) continue;
-      customerNames.push(cust);
-      for (const order of grouped[cust]) {
-        if (order.status !== "picked_up") orderIds.push(order.id);
-      }
-    }
+  const handleMarkCustomerPickedUp = (cust) => {
+    const orderIds = grouped[cust]
+      .filter(o => o.status !== "picked_up")
+      .map(o => o.id);
     if (!orderIds.length) return;
 
-    // Replace any existing pending confirm
-    if (pickupTimerRef.current) clearTimeout(pickupTimerRef.current);
+    if (pickupTimerRef.current) {
+      clearTimeout(pickupTimerRef.current);
+      if (pendingPickup) confirmPickupApi(pendingPickup.orderIds);
+    }
 
     pickupTimerRef.current = setTimeout(() => {
       confirmPickupApi(orderIds);
@@ -185,18 +138,14 @@ export default function PickingListPage() {
       pickupTimerRef.current = null;
     }, 3000);
 
-    const singleCustomer = customerNames.length === 1 ? customerNames[0] : null;
-    const firstCustOrders = singleCustomer ? (grouped[singleCustomer] || []) : [];
-
+    const firstOrder = grouped[cust][0];
     setPendingPickup({
       id: Date.now(),
       orderIds,
-      customerName: singleCustomer,
-      message: customerNames.length === 1
-        ? "Marcat com a recollit"
-        : `${customerNames.length} clients marcats com a recollits`,
-      firstCustPlace: firstCustOrders[0]?.place || filterPlace,
-      firstCustDate:  firstCustOrders[0]?.date  || filterDate,
+      customerName: cust,
+      message: "Marcat com a recollit",
+      firstCustPlace: firstOrder?.place || filterPlace,
+      firstCustDate:  firstOrder?.date  || filterDate,
     });
   };
 
@@ -227,104 +176,145 @@ export default function PickingListPage() {
     navigate("/add", { state: { prefillPlace: filterPlace, prefillDate: filterDate, returnPath: "/picking" } });
   };
 
-  // ── Derived counts ──────────────────────────────────────────────────────────
+  const contextLabel = `${getShortDateLabel(filterDate)}${filterPlace ? ` · ${filterPlace}` : ""}`;
 
-  const checkedCount = visibleCustomers.filter(c =>
-    isCustomerDone(c) || grouped[c].every(o => o.status === "picked_up")
-  ).length;
-  const confirmableCount = visibleCustomers.filter(c =>
-    isCustomerDone(c) && !grouped[c].every(o => o.status === "picked_up")
-  ).length;
-  const totalCount = visibleCustomers.length;
-
-  const printTitle = [
-    "Llista de Recollida",
-    filterPlace || null,
-    filterDate ? getDateLabel(filterDate) : null,
-  ].filter(Boolean).join(" · ");
-
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="picking-root">
-      {/* ── Screen header ── */}
-      <div className="no-print picking-header">
-        <div className="picking-header-left">
-          <button onClick={() => navigate("/")} className="picking-back-btn">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="picking-title">Llista de Recollida</h1>
-            <p className="picking-subtitle">{checkedCount}/{totalCount} clients marcats</p>
+    <div className="min-h-screen" style={{ backgroundColor: "#FAFAF5" }}>
+
+      {/* ── Fixed header ── */}
+      <div className="no-print fixed top-0 inset-x-0 z-40 bg-white border-b border-stone-200 shadow-sm">
+        <div className="max-w-lg mx-auto">
+
+          {/* Row 1: Back + Context */}
+          <div className="flex items-center gap-3 px-4 pt-3 pb-2">
+            <button
+              onClick={() => navigate("/")}
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 transition-colors flex-shrink-0"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setShowContextModal(true)}
+              className="flex-1 flex items-center gap-2 bg-stone-50 rounded-xl px-4 py-2.5 text-left hover:bg-stone-100 transition-colors border border-stone-200"
+            >
+              <span className="text-sm font-bold text-stone-900 flex-1 truncate">
+                📍 {contextLabel}
+              </span>
+              <ChevronDown className="w-4 h-4 text-stone-400 flex-shrink-0" />
+            </button>
+          </div>
+
+          {/* Row 2: Progress + Toggle */}
+          <div className="px-4 pb-2">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs text-stone-500">
+                Entregades: <span className="font-bold text-stone-700">{deliveredCount} / {totalCount}</span>
+              </span>
+              <div className="flex rounded-lg overflow-hidden border border-stone-200 text-xs font-semibold">
+                <button
+                  onClick={() => setHideDone(true)}
+                  className={`px-3 py-1 transition-colors ${hideDone ? "bg-stone-800 text-white" : "text-stone-500 bg-white hover:bg-stone-50"}`}
+                >
+                  Pendents
+                </button>
+                <button
+                  onClick={() => setHideDone(false)}
+                  className={`px-3 py-1 transition-colors border-l border-stone-200 ${!hideDone ? "bg-stone-800 text-white" : "text-stone-500 bg-white hover:bg-stone-50"}`}
+                >
+                  Totes
+                </button>
+              </div>
+            </div>
+            <div className="h-1.5 rounded-full bg-stone-100 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-emerald-400 transition-all duration-500"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Row 3: Search */}
+          <div className="px-4 pb-3">
+            <input
+              type="text"
+              placeholder="Busca un client..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full px-4 py-2 rounded-xl border border-stone-200 bg-stone-50 text-stone-800 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
+            />
           </div>
         </div>
-        <div className="picking-header-right">
-          <button onClick={() => window.print()} className="picking-btn picking-btn-ghost">
-            <Printer className="w-4 h-4" />
-            <span>Imprimir</span>
-          </button>
-          <button
-            onClick={applyPickups}
-            disabled={saving || confirmableCount === 0}
-            className="picking-btn picking-btn-primary"
-          >
-            <CheckCheck className="w-4 h-4" />
-            <span>{saving ? "Guardant..." : "Confirmar"}</span>
-          </button>
-        </div>
       </div>
 
-      {/* ── Date navigation ── */}
-      <div className="no-print picking-date-nav">
-        <button onClick={() => setFilterDate(prev => addDays(prev || today, -1))} className="picking-arrow">&#8249;</button>
-        <div className="relative" style={{ flex: 1 }}>
-          <button onClick={() => document.getElementById("pick-date").showPicker?.()} className="picking-date-btn">
-            {filterDate ? getDateLabel(filterDate) : "Totes les dates"}
-          </button>
-          <input
-            id="pick-date"
-            type="date"
-            value={filterDate}
-            onChange={e => setFilterDate(e.target.value)}
-            className="absolute opacity-0 pointer-events-none"
-            style={{ top: 0, left: 0, width: "1px", height: "1px" }}
-          />
-        </div>
-        <button onClick={() => setFilterDate(prev => addDays(prev || today, 1))} className="picking-arrow">&#8250;</button>
-        <button
-          onClick={() => setHideDone(p => !p)}
-          className={"picking-toggle " + (hideDone ? "picking-toggle-on" : "picking-toggle-off")}
-        >
-          {hideDone ? "Pendents" : "Totes"}
-        </button>
-        <button onClick={toggleAll} className="picking-btn-sm picking-btn-ghost no-print">
-          <RotateCcw className="w-3.5 h-3.5" />
-          Sel. tot
-        </button>
+      {/* ── Print-only header ── */}
+      <div className="hidden print:block px-4 pt-4 pb-3 border-b-2 border-black mb-2">
+        <strong>Llista de Recollida · {contextLabel}</strong>
       </div>
 
-      {/* ── Place chips ── */}
-      <div className="no-print picking-place-row">
-        <button
-          onClick={() => setFilterPlace("")}
-          className={"picking-place-chip " + (!filterPlace ? "picking-place-chip-on" : "")}
-        >
-          Tots els llocs
-        </button>
-        {PLACES.map(p => (
-          <button
-            key={p}
-            onClick={() => setFilterPlace(prev => prev === p ? "" : p)}
-            className={"picking-place-chip " + (filterPlace === p ? "picking-place-chip-on" : "")}
-          >
-            {p}
-          </button>
-        ))}
-      </div>
+      {/* ── Content ── */}
+      <div className="max-w-lg mx-auto px-4 pb-24 print:pt-2" style={{ paddingTop: "168px" }}>
+        {loading ? (
+          <div className="flex flex-col items-center gap-3 py-16 text-stone-500">
+            <div className="w-9 h-9 border-4 border-amber-200 border-t-amber-400 rounded-full animate-spin" />
+            <span className="text-sm">Carregant...</span>
+          </div>
+        ) : error ? (
+          <div className="text-center py-16 text-stone-500 text-sm">{error}</div>
+        ) : visibleCustomers.length === 0 ? (
+          <div className="text-center py-16 text-stone-500 text-sm">No hi ha comandes per mostrar</div>
+        ) : (
+          visibleCustomers.map(customer => {
+            const custOrders = grouped[customer];
+            const allPickedUp = custOrders.every(o => o.status === "picked_up");
+            const isPending   = !!(pendingPickup && custOrders.some(o => pendingPickup.orderIds?.includes(o.id)));
 
-      {/* ── Print header ── */}
-      <div className="print-only picking-print-header">
-        <strong>{printTitle}</strong>
+            return (
+              <div
+                key={customer}
+                className={`bg-white rounded-2xl border mb-3 overflow-hidden shadow-sm print:shadow-none print:break-inside-avoid transition-all ${
+                  allPickedUp ? "border-emerald-200" : isPending ? "border-amber-300" : "border-stone-200"
+                }`}
+              >
+                <div className="p-4 pb-3">
+                  <h2 className={`text-xl font-extrabold leading-tight mb-3 ${
+                    allPickedUp ? "text-emerald-600 line-through decoration-emerald-300" : "text-stone-900"
+                  }`}>
+                    {customer}
+                  </h2>
+                  <div className="space-y-2.5">
+                    {custOrders.flatMap((order, oi) =>
+                      order.fruits.map((fruit, fi) => (
+                        <div key={`${oi}-${fi}`} className="flex items-start gap-2.5">
+                          <span className="text-lg flex-shrink-0 mt-0.5">{FRUIT_EMOJI[fruit.fruit] || "🍓"}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-semibold text-stone-800 leading-snug">{renderFruitLabel(fruit)}</div>
+                            <div className="text-xs text-stone-500 mt-0.5">{renderFruitDetails(fruit)}</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => !allPickedUp && !isPending && handleMarkCustomerPickedUp(customer)}
+                  disabled={allPickedUp || isPending}
+                  className={`no-print w-full py-3.5 text-sm font-bold tracking-wide transition-all ${
+                    allPickedUp
+                      ? "bg-emerald-50 text-emerald-600 cursor-default"
+                      : isPending
+                      ? "bg-amber-50 text-amber-500 cursor-default"
+                      : "bg-stone-900 text-white hover:bg-stone-700 active:scale-[0.99]"
+                  }`}
+                >
+                  {allPickedUp ? "✓ ENTREGAT" : isPending ? "PENDENT DE CONFIRMAR…" : "MARCAR COM A ENTREGAT"}
+                </button>
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* ── FAB: Nova Comanda ── */}
@@ -344,85 +334,70 @@ export default function PickingListPage() {
         onNewOrder={pendingPickup?.customerName ? handleNewOrderSameName : null}
       />
 
-      {/* ── Content ── */}
-      <div className="picking-content" style={{ paddingBottom: '5rem' }}>
-        {loading ? (
-          <div className="picking-loading">
-            <div className="picking-spinner"></div>
-            <span>Carregant...</span>
-          </div>
-        ) : error ? (
-          <div className="picking-empty">{error}</div>
-        ) : visibleCustomers.length === 0 ? (
-          <div className="picking-empty">No hi ha comandes per mostrar</div>
-        ) : (
-          visibleCustomers.map(customer => {
-            const custOrders = grouped[customer];
-            const allPickedUp = custOrders.every(o => o.status === "picked_up");
-            const done = isCustomerDone(customer) || allPickedUp;
-            const allKeys = allKeysForCustomer(customer);
-            const checkedKeys = allKeys.filter(k => checked.has(k));
-            const partiallyDone = checkedKeys.length > 0 && !done;
+      {/* ── Context modal ── */}
+      {showContextModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+          onClick={e => { if (e.target === e.currentTarget) setShowContextModal(false); }}
+        >
+          <div className="w-full max-w-md bg-white rounded-2xl p-5 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-stone-900">Canviar context</h3>
+              <button
+                onClick={() => setShowContextModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full text-stone-400 hover:bg-stone-100 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-            return (
-              <div key={customer} className={"picking-card " + (done ? "picking-card-done" : "")}>
-                <div className="picking-customer-header" onClick={() => !allPickedUp && toggleCustomer(customer)} style={allPickedUp ? { cursor: "default" } : {}}>
-                  <div className={"picking-checkbox picking-checkbox-lg " +
-                    (done ? "picking-checkbox-checked" : partiallyDone ? "picking-checkbox-partial" : "")
-                  }>
-                    {done && <span className="picking-check-icon">&#10003;</span>}
-                    {partiallyDone && <span className="picking-check-icon picking-dash">&#8722;</span>}
-                  </div>
-                  <div className="picking-customer-info">
-                    <span className="picking-customer-name">{customer}</span>
-                    <span className="picking-customer-meta">
-                      {[...new Set(custOrders.map(o => o.place))].join(" · ")}
-                      {" · "}
-                      {formatDate(custOrders[0].date)}
-                      {allPickedUp && (
-                        <span className="picking-status-tag">Recollit</span>
-                      )}
-                      {custOrders.some(o => o.status === "ready") && !allPickedUp && (
-                        <span className="picking-status-tag picking-status-ready">Preparat</span>
-                      )}
-                    </span>
-                  </div>
-                  <span className="picking-item-count no-print">
-                    {done ? allKeys.length : checkedKeys.length}/{allKeys.length}
-                  </span>
-                </div>
-
-                <div className="picking-items">
-                  {custOrders.map(order =>
-                    order.fruits.map((fruit, idx) => {
-                      const key = itemKey(order.id, idx);
-                      const frozenByBackend = order.status === "picked_up";
-                      const isChecked = checked.has(key) || frozenByBackend;
-                      return (
-                        <div
-                          key={key}
-                          className={"picking-item " + (isChecked ? "picking-item-done" : "")}
-                          onClick={() => !frozenByBackend && toggleItem(key)}
-                          style={frozenByBackend ? { cursor: "default" } : {}}
-                        >
-                          <div className={"picking-checkbox " + (isChecked ? "picking-checkbox-checked" : "")}>
-                            {isChecked && <span className="picking-check-icon">&#10003;</span>}
-                          </div>
-                          <span className="picking-fruit-emoji">{FRUIT_EMOJI[fruit.fruit] || "🍓"}</span>
-                          <div className="picking-fruit-text">
-                            <span className="picking-fruit-name">{renderFruitLabel(fruit)}</span>
-                            <span className="picking-fruit-detail">{renderFruitDetails(fruit)}</span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
+            {/* Date nav */}
+            <label className="block text-xs text-stone-400 uppercase tracking-wide font-medium mb-2">Data</label>
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                onClick={() => setFilterDate(prev => addDays(prev || today, -1))}
+                className="w-10 h-10 flex items-center justify-center rounded-xl border border-stone-200 hover:bg-stone-50 transition-colors flex-shrink-0"
+              >
+                <ChevronLeft className="w-5 h-5 text-stone-600" />
+              </button>
+              <div className="flex-1 text-center font-semibold text-stone-900 text-sm">
+                {getFullDateLabel(filterDate)}
               </div>
-            );
-          })
-        )}
-      </div>
+              <button
+                onClick={() => setFilterDate(prev => addDays(prev || today, 1))}
+                className="w-10 h-10 flex items-center justify-center rounded-xl border border-stone-200 hover:bg-stone-50 transition-colors flex-shrink-0"
+              >
+                <ChevronRight className="w-5 h-5 text-stone-600" />
+              </button>
+            </div>
+
+            {/* Place chips */}
+            <label className="block text-xs text-stone-400 uppercase tracking-wide font-medium mb-2">Lloc</label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setFilterPlace("")}
+                className={`px-3 py-1.5 rounded-xl text-sm font-medium border transition-colors ${
+                  !filterPlace ? "bg-stone-900 text-white border-stone-900" : "bg-white text-stone-700 border-stone-300 hover:bg-stone-50"
+                }`}
+              >
+                Tots
+              </button>
+              {PLACES.map(p => (
+                <button
+                  key={p}
+                  onClick={() => setFilterPlace(prev => prev === p ? "" : p)}
+                  className={`px-3 py-1.5 rounded-xl text-sm font-medium border transition-colors ${
+                    filterPlace === p ? "bg-stone-900 text-white border-stone-900" : "bg-white text-stone-700 border-stone-300 hover:bg-stone-50"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

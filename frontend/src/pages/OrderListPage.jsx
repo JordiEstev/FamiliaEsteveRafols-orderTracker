@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Plus, Package, Pencil, Trash2, Sheet, ClockArrowDown, ClockArrowUp,
+  Plus, Package, Pencil, Trash2, Sheet, Printer, ClockArrowDown, ClockArrowUp,
   ClipboardList, ChevronDown, Copy, Check, ArrowUp,
 } from "lucide-react";
 import PickupToast from "../components/PickupToast";
@@ -473,7 +473,7 @@ function OrderListPage() {
       </AnimatePresence>
 
       {/* ── Fixed top navbar ── */}
-      <nav className="fixed top-0 inset-x-0 z-50 bg-white border-b border-stone-100 shadow-sm">
+      <nav className="fixed top-0 inset-x-0 z-50 bg-white border-b border-stone-100 shadow-sm print:hidden">
         <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
           <img src="/logopressec1.png" alt="Logo" className="h-9 w-9 object-contain" />
           <div className="flex items-center">
@@ -484,6 +484,12 @@ function OrderListPage() {
               <Package className="w-5 h-5" style={{ color: "#F59E0B" }} />
             </button>
             <button
+              onClick={() => window.print()}
+              className="p-2.5 rounded-xl hover:bg-stone-50 transition-colors"
+              title="Imprimir">
+              <Printer className="w-5 h-5 text-stone-400" />
+            </button>
+            <button
               onClick={handleExport}
               className="p-2.5 rounded-xl hover:bg-stone-50 transition-colors"
               title="Exportar">
@@ -492,7 +498,7 @@ function OrderListPage() {
             <button
               onClick={() => navigate("/picking")}
               className="p-2.5 rounded-xl hover:bg-stone-50 transition-colors"
-              title="Llista de Recollida">
+              title="Mode Parada">
               <ClipboardList className="w-5 h-5 text-stone-500" />
             </button>
           </div>
@@ -504,7 +510,7 @@ function OrderListPage() {
         <div className="max-w-md mx-auto px-4 pt-3 pb-28">
 
           {/* ── Filter section (non-sticky, gray bg) ── */}
-          <div className="bg-gray-50 rounded-2xl p-3 mb-4 border border-stone-100 space-y-2">
+          <div className="bg-gray-50 rounded-2xl p-3 mb-4 border border-stone-100 space-y-2 print:hidden">
             {/* Search */}
             <input
               type="text"
@@ -609,13 +615,16 @@ function OrderListPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.97 }}
                     transition={{ type: "spring", stiffness: 80, damping: 15 }}
-                    className="bg-white rounded-2xl shadow-sm mb-3 overflow-hidden"
+                    className="bg-white rounded-2xl shadow-sm mb-3 overflow-hidden print:shadow-none print:rounded-xl print:break-inside-avoid"
                     style={{ border: "1px solid #F5F5F4", borderLeft: `4px solid ${(STATUS_CONFIG[order.status] || STATUS_CONFIG.pending).color}` }}
                   >
                     <div className="p-4">
                       <div className="flex items-start justify-between gap-2 mb-2">
-                        <span className="font-bold text-stone-900 text-base leading-tight truncate flex-1 min-w-0">{order.customer}</span>
-                        <span className="text-xs text-stone-400 whitespace-nowrap mt-0.5 shrink-0">{formatFullDate(order.created_at)}</span>
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <span className="hidden print:inline-flex w-5 h-5 border-2 border-black rounded flex-shrink-0" />
+                          <span className="font-bold text-stone-900 text-base leading-tight truncate">{order.customer}</span>
+                        </div>
+                        <span className="text-xs text-stone-400 whitespace-nowrap mt-0.5 shrink-0 print:hidden">{formatFullDate(order.created_at)}</span>
                       </div>
                       <div className="space-y-0.5 mb-2">
                         {order.fruits.map((fruit, idx) => (
@@ -636,7 +645,7 @@ function OrderListPage() {
                       {order.notes?.trim() && (
                         <div className="mb-3 text-xs text-stone-500 italic bg-stone-50 rounded-lg px-3 py-2 border border-stone-100 line-clamp-2">{order.notes.trim()}</div>
                       )}
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 print:hidden">
                         <button onClick={() => navigate(`/edit/${order.id}`, { state: { returnPath: "/" } })}
                           className="bg-stone-50 hover:bg-stone-100 text-stone-600 border border-stone-200 px-3 py-2 rounded-xl text-sm flex items-center justify-center gap-1.5 transition-colors font-medium">
                           <Pencil className="w-3.5 h-3.5" />
@@ -678,6 +687,9 @@ function OrderListPage() {
               </AnimatePresence>
             </motion.div>
           )}
+
+          {/* ── Print-only summary ── */}
+          <PrintSummary fruitSummary={fruitSummary} />
 
         </div>
       </div>
@@ -946,18 +958,18 @@ function OrderListPage() {
       </AnimatePresence>
 
       {/* ── Pickup undo toast ── */}
-      <PickupToast
-        pending={pendingPickup}
-        onUndo={handleUndoPickup}
-        onNewOrder={handleNewOrderSameName}
-      />
-
-      {/* ── Delete undo toast ── */}
-      <PickupToast
-        pending={pendingDelete ? { ...pendingDelete, message: "Comanda eliminada" } : null}
-        onUndo={handleUndoDelete}
-        onNewOrder={null}
-      />
+      <div className="print:hidden">
+        <PickupToast
+          pending={pendingPickup}
+          onUndo={handleUndoPickup}
+          onNewOrder={handleNewOrderSameName}
+        />
+        <PickupToast
+          pending={pendingDelete ? { ...pendingDelete, message: "Comanda eliminada" } : null}
+          onUndo={handleUndoDelete}
+          onNewOrder={null}
+        />
+      </div>
 
       {/* ── FAB: scroll to top ── */}
       <AnimatePresence>
@@ -969,7 +981,7 @@ function OrderListPage() {
             exit={{ scale: 0, opacity: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 22 }}
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="fixed bottom-20 right-4 w-11 h-11 rounded-full bg-white border border-stone-200 shadow-lg text-stone-600 flex items-center justify-center z-30 active:scale-95"
+            className="fixed bottom-20 right-4 w-11 h-11 rounded-full bg-white border border-stone-200 shadow-lg text-stone-600 flex items-center justify-center z-30 active:scale-95 print:hidden"
           >
             <ArrowUp className="w-4 h-4" />
           </motion.button>
@@ -979,7 +991,7 @@ function OrderListPage() {
       {/* ── FAB: add order ── */}
       <button
         onClick={() => navigate("/add", { state: { prefillDate: addDays(today, 7), returnPath: "/" } })}
-        className="fixed bottom-4 right-4 w-14 h-14 rounded-full text-white shadow-xl flex items-center justify-center z-30 transition-all active:scale-95 hover:brightness-110"
+        className="fixed bottom-4 right-4 w-14 h-14 rounded-full text-white shadow-xl flex items-center justify-center z-30 transition-all active:scale-95 hover:brightness-110 print:hidden"
         style={{ backgroundColor: "#F59E0B" }}
         title="Afegir comanda"
       >
@@ -1008,6 +1020,79 @@ function renderFruitDetails(item) {
   if (item.fruit === "melo")    return `Melo: ${item.qty} peces${item.weight ? ` - ${item.weight} kg` : ""}`;
   if (item.fruit === "sindria") return `Sindria: ${item.qty} peces${item.weight ? ` - ${item.weight} kg` : ""}`;
   return `${capitalize(item.fruit)}: ${item.qty}`;
+}
+
+// ── Print-only fruit summary ──────────────────────────────────────────────────
+
+function PrintSummary({ fruitSummary }) {
+  const pressecEntries = Object.entries(fruitSummary.pressecsGrouped);
+  const ab1 = fruitSummary.albercoc["1"].reduce((a, x) => a + x.qty, 0);
+  const ab2 = fruitSummary.albercoc["2"].reduce((a, x) => a + x.qty, 0);
+  const ci1 = fruitSummary.cirera["1"].reduce((a, x) => a + x.qty, 0);
+  const ci2 = fruitSummary.cirera["2"].reduce((a, x) => a + x.qty, 0);
+  const meloTotal    = fruitSummary.melo.reduce((a, x) => a + x.qty, 0);
+  const sindriaTotal = fruitSummary.sindria.reduce((a, x) => a + x.qty, 0);
+  const abKg = ab1 + ab2 * 2;
+  const ciKg = ci1 + ci2 * 2;
+
+  if (!pressecEntries.length && !abKg && !ciKg && !meloTotal && !sindriaTotal) return null;
+
+  return (
+    <div className="hidden print:block mt-8 pt-6 border-t-2 border-black">
+      <h2 className="text-base font-bold mb-3">Resum de Fruita</h2>
+      <table style={{ borderCollapse: "collapse", width: "100%", fontSize: "0.85rem" }}>
+        <tbody>
+          {pressecEntries.map(([variant, sizes]) => {
+            const total = Object.values(sizes).reduce((a, list) => a + list.reduce((s, x) => s + x.qty, 0), 0);
+            return (
+              <tr key={variant}>
+                <td style={{ padding: "3px 8px 3px 0", fontWeight: 600 }}>🍑 Pressec {variant}</td>
+                <td style={{ padding: "3px 8px" }}>
+                  {Object.entries(sizes).map(([size, list]) => {
+                    const sub = list.reduce((a, x) => a + x.qty, 0);
+                    return `Cal.${size}: ${sub}`;
+                  }).join(" · ")}
+                </td>
+                <td style={{ padding: "3px 0", fontWeight: 700, textAlign: "right" }}>{total} caixes</td>
+              </tr>
+            );
+          })}
+          {abKg > 0 && (
+            <tr>
+              <td style={{ padding: "3px 8px 3px 0", fontWeight: 600 }}>🟠 Albercoc</td>
+              <td style={{ padding: "3px 8px" }}>
+                {ab1 > 0 && `${ab1} tarrines 1kg`}{ab1 > 0 && ab2 > 0 && " · "}{ab2 > 0 && `${ab2} caixes 2kg`}
+              </td>
+              <td style={{ padding: "3px 0", fontWeight: 700, textAlign: "right" }}>{abKg} kg</td>
+            </tr>
+          )}
+          {ciKg > 0 && (
+            <tr>
+              <td style={{ padding: "3px 8px 3px 0", fontWeight: 600 }}>🍒 Cirera</td>
+              <td style={{ padding: "3px 8px" }}>
+                {ci1 > 0 && `${ci1} tarrines 1kg`}{ci1 > 0 && ci2 > 0 && " · "}{ci2 > 0 && `${ci2} caixes 2kg`}
+              </td>
+              <td style={{ padding: "3px 0", fontWeight: 700, textAlign: "right" }}>{ciKg} kg</td>
+            </tr>
+          )}
+          {meloTotal > 0 && (
+            <tr>
+              <td style={{ padding: "3px 8px 3px 0", fontWeight: 600 }}>🍈 Meló</td>
+              <td style={{ padding: "3px 8px" }}></td>
+              <td style={{ padding: "3px 0", fontWeight: 700, textAlign: "right" }}>{meloTotal} peces</td>
+            </tr>
+          )}
+          {sindriaTotal > 0 && (
+            <tr>
+              <td style={{ padding: "3px 8px 3px 0", fontWeight: 600 }}>🍉 Síndria</td>
+              <td style={{ padding: "3px 8px" }}></td>
+              <td style={{ padding: "3px 0", fontWeight: 700, textAlign: "right" }}>{sindriaTotal} peces</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 export default OrderListPage;
