@@ -47,6 +47,30 @@ export function renderFruitDetails(item) {
   return `${item.qty}`;
 }
 
+// Day-of-week → available places (0=Sun, 6=Sat)
+const PLACES_FOR_DAY = {
+  0: ["Sant Pau", "Cantallops"],
+  1: ["Cantallops"],
+  2: ["Cantallops"],
+  3: ["Cantallops", "La Girada", "El Pla", "Puigdalber"],
+  4: ["Cantallops"],
+  5: ["Cantallops"],
+  6: ["Sant Pau", "Cantallops"],
+};
+
+export function getPlacesForDate(dateStr) {
+  if (!dateStr) return PLACES;
+  const date = new Date(dateStr + "T00:00:00");
+  return PLACES_FOR_DAY[date.getDay()] ?? ["Cantallops"];
+}
+
+// Returns target weekday number for a place (null = any day = Cantallops)
+export function getWeekdayForPlace(place) {
+  if (place === "Sant Pau") return 6;
+  if (["La Girada", "El Pla", "Puigdalber"].includes(place)) return 3;
+  return null;
+}
+
 export function renderFruitExportLine(item) {
   if (item.fruit.startsWith("pressec_")) {
     const type = item.fruit.split("_")[1];

@@ -3,17 +3,9 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ChevronRight, Pencil, Plus as PlusIcon, Check, Calendar } from "lucide-react";
 import FruitSelectorModal from "../components/FruitSelectorModal";
-import { PLACES, renderFruitLabel, renderFruitDetails } from "../utils/fruit";
+import { PLACES, renderFruitLabel, renderFruitDetails, getWeekdayForPlace } from "../utils/fruit";
 
 // ── Constants ────────────────────────────────────────────────────────────────
-
-const PLACE_DATE_TYPE = {
-  "La Girada":  "wednesday",
-  "El Pla":     "wednesday",
-  "Puigdalber": "wednesday",
-  "Sant Pau":   "weekend",
-  "Cantallops": "friday",
-};
 
 const FRUIT_EMOJI = {
   pressec_groc: "🍑", pressec_barrejat: "🍑", pressec_vermell: "🍑",
@@ -22,6 +14,7 @@ const FRUIT_EMOJI = {
 
 const STEP_LABELS = ["Client", "Lloc", "Data", "Fruita", "Resum"];
 const TOTAL_STEPS = 5;
+const DIES = ["Diumenge","Dilluns","Dimarts","Dimecres","Dijous","Divendres","Dissabte"];
 
 // ── Helpers (timezone-safe, always uses Europe/Madrid) ────────────────────────
 
@@ -50,6 +43,12 @@ function ddmm(dateStr) {
   if (!dateStr) return "";
   const [, m, d] = dateStr.split("-");
   return `${d}/${m}`;
+}
+
+function addWeeks(dateStr, n) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const r = new Date(Date.UTC(y, m - 1, d + n * 7));
+  return `${r.getUTCFullYear()}-${String(r.getUTCMonth()+1).padStart(2,'0')}-${String(r.getUTCDate()).padStart(2,'0')}`;
 }
 
 function formatDisplayDate(dateStr) {
@@ -126,26 +125,28 @@ export default function AddOrderWizard() {
   };
 
   const getDateOptions = () => {
-    const type = PLACE_DATE_TYPE[order.place] ?? "any";
-    if (type === "wednesday") return [
-      { label: "Pròxim dimecres", value: getNextWeekday(3) },
-      { label: "Altra data",      value: "other" },
+    const targetDay = getWeekdayForPlace(order.place);
+
+    if (targetDay === null) {
+      // Cantallops: any day — show today/tomorrow + open calendar
+      return [
+        { label: "Avui",       value: todayStr() },
+        { label: "Demà",       value: tomorrowStr() },
+        { label: "Altra data", value: "other" },
+      ];
+    }
+
+    // Non-Cantallops: show next 4 occurrences of the target weekday, no calendar
+    const dayName = DIES[targetDay];
+    const first   = getNextWeekday(targetDay);
+    const dates   = [first, addWeeks(first, 1), addWeeks(first, 2), addWeeks(first, 3)];
+    const labels  = [
+      `Aquest ${dayName}`,
+      "+1 Setmana",
+      "+2 Setmanes",
+      "+3 Setmanes",
     ];
-    if (type === "weekend") return [
-      { label: "Pròxim dissabte", value: getNextWeekday(6) },
-      { label: "Pròxim diumenge", value: getNextWeekday(0) },
-      { label: "Altra data",      value: "other" },
-    ];
-    if (type === "friday") return [
-      { label: "Pròxim divendres", value: getNextWeekday(5) },
-      { label: "Avui",             value: todayStr() },
-      { label: "Altra data",       value: "other" },
-    ];
-    return [
-      { label: "Avui",        value: todayStr() },
-      { label: "Demà",        value: tomorrowStr() },
-      { label: "Altra data",  value: "other" },
-    ];
+    return dates.map((value, i) => ({ label: labels[i], value }));
   };
 
   const handleDateOption = (value) => {

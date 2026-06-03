@@ -8,7 +8,7 @@ import PickupToast from "../components/PickupToast";
 import * as XLSX from 'xlsx';
 import './OrderListPage.css';
 import { motion, AnimatePresence } from "framer-motion";
-import { renderFruitExportLine, PLACES } from "../utils/fruit";
+import { renderFruitExportLine, PLACES, getPlacesForDate } from "../utils/fruit";
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -164,6 +164,14 @@ function OrderListPage() {
   useEffect(() => {
     sessionStorage.setItem("olist_filters", JSON.stringify({ search, filterDate, filterPlace, sortNewestFirst }));
   }, [search, filterDate, filterPlace, sortNewestFirst]);
+
+  // Reset place when date changes if no longer available
+  useEffect(() => {
+    const available = getPlacesForDate(filterDate);
+    if (filterPlace !== "Tots els llocs" && !available.includes(filterPlace)) {
+      setFilterPlace("Tots els llocs");
+    }
+  }, [filterDate]);
 
   useEffect(() => {
     if (sortMessage) { const t = setTimeout(() => setSortMessage(""), 2000); return () => clearTimeout(t); }
@@ -570,7 +578,7 @@ function OrderListPage() {
 
             {/* Place chips */}
             <div className="flex gap-1.5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-              {["Tots els llocs", ...PLACES].map(place => (
+              {["Tots els llocs", ...getPlacesForDate(filterDate)].map(place => (
                 <button
                   key={place}
                   onClick={() => setFilterPlace(place)}
