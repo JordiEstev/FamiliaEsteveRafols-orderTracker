@@ -145,14 +145,16 @@ export default function AddOrderWizard() {
     // Sant Pau: 3 weekends of Sat+Sun pairs (includes today if today is Sat/Sun)
     if (order.place === "Sant Pau") {
       const sat0 = getThisOrNextWeekday(6);
+      const ann  = (d) => { const t = todayStr(), tm = tomorrowStr(); return d === t ? " (Avui)" : d === tm ? " (Demà)" : ""; };
+      const sun1 = addDaysToDate(sat0, 1);
       return [
-        { label: "Aquest dissabte",  value: sat0 },
-        { label: "Aquest diumenge",  value: addDaysToDate(sat0, 1) },
-        { label: "Dissabte següent", value: addDaysToDate(sat0, 7) },
-        { label: "Diumenge següent", value: addDaysToDate(sat0, 8) },
-        { label: "Dissabte",         value: addDaysToDate(sat0, 14) },
-        { label: "Diumenge",         value: addDaysToDate(sat0, 15) },
-        { label: "Altra data",       value: "other" },
+        { label: `Aquest dissabte${ann(sat0)}`,   value: sat0 },
+        { label: `Aquest diumenge${ann(sun1)}`,   value: sun1 },
+        { label: `Dissabte següent${ann(addDaysToDate(sat0, 7))}`,  value: addDaysToDate(sat0, 7) },
+        { label: `Diumenge següent${ann(addDaysToDate(sat0, 8))}`,  value: addDaysToDate(sat0, 8) },
+        { label: `Dissabte${ann(addDaysToDate(sat0, 14))}`,         value: addDaysToDate(sat0, 14) },
+        { label: `Diumenge${ann(addDaysToDate(sat0, 15))}`,         value: addDaysToDate(sat0, 15) },
+        { label: "Altra data",                    value: "other" },
       ];
     }
 
@@ -167,13 +169,14 @@ export default function AddOrderWizard() {
       ];
     }
 
-    // La Girada / El Pla / Puigdalber: 4 Wednesday dates + calendar
+    // La Girada / El Pla / Puigdalber: 4 weekday dates + calendar
     const dayName = DIES[targetDay];
     const first   = getNextWeekday(targetDay);
+    const ann2    = (d) => { const t = todayStr(), tm = tomorrowStr(); return d === t ? " (Avui)" : d === tm ? " (Demà)" : ""; };
     const dates   = [first, addWeeks(first, 1), addWeeks(first, 2), addWeeks(first, 3)];
     const labels  = [`Aquest ${dayName}`, "+1 Setmana", "+2 Setmanes", "+3 Setmanes"];
     return [
-      ...dates.map((value, i) => ({ label: labels[i], value })),
+      ...dates.map((value, i) => ({ label: `${labels[i]}${ann2(value)}`, value })),
       { label: "Altra data", value: "other" },
     ];
   };
