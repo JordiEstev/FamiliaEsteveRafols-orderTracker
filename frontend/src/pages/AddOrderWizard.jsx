@@ -57,6 +57,17 @@ function addDaysToDate(dateStr, n) {
   return `${r.getUTCFullYear()}-${String(r.getUTCMonth()+1).padStart(2,'0')}-${String(r.getUTCDate()).padStart(2,'0')}`;
 }
 
+// Returns today if today matches targetDay, otherwise next occurrence
+function getThisOrNextWeekday(targetDay) {
+  const base = new Date().toLocaleDateString('sv', { timeZone: 'Europe/Madrid' });
+  const [y, m, d] = base.split('-').map(Number);
+  const todayUTC = new Date(Date.UTC(y, m - 1, d));
+  const diff = (targetDay - todayUTC.getUTCDay() + 7) % 7;
+  if (diff === 0) return base;
+  const r = new Date(Date.UTC(y, m - 1, d + diff));
+  return `${r.getUTCFullYear()}-${String(r.getUTCMonth()+1).padStart(2,'0')}-${String(r.getUTCDate()).padStart(2,'0')}`;
+}
+
 function formatDisplayDate(dateStr) {
   if (!dateStr) return "";
   const DIES  = ["Diumenge","Dilluns","Dimarts","Dimecres","Dijous","Divendres","Dissabte"];
@@ -131,9 +142,9 @@ export default function AddOrderWizard() {
   };
 
   const getDateOptions = () => {
-    // Sant Pau: 3 weekends of Sat+Sun pairs
+    // Sant Pau: 3 weekends of Sat+Sun pairs (includes today if today is Sat/Sun)
     if (order.place === "Sant Pau") {
-      const sat0 = getNextWeekday(6);
+      const sat0 = getThisOrNextWeekday(6);
       return [
         { label: "Aquest dissabte",  value: sat0 },
         { label: "Aquest diumenge",  value: addDaysToDate(sat0, 1) },
@@ -141,13 +152,14 @@ export default function AddOrderWizard() {
         { label: "Diumenge següent", value: addDaysToDate(sat0, 8) },
         { label: "Dissabte",         value: addDaysToDate(sat0, 14) },
         { label: "Diumenge",         value: addDaysToDate(sat0, 15) },
+        { label: "Altra data",       value: "other" },
       ];
     }
 
     const targetDay = getWeekdayForPlace(order.place);
 
     if (targetDay === null) {
-      // Cantallops: any day — show today/tomorrow + open calendar
+      // Cantallops: any day
       return [
         { label: "Avui",       value: todayStr() },
         { label: "Demà",       value: tomorrowStr() },
@@ -155,12 +167,15 @@ export default function AddOrderWizard() {
       ];
     }
 
-    // La Girada / El Pla / Puigdalber: 4 Wednesday dates
+    // La Girada / El Pla / Puigdalber: 4 Wednesday dates + calendar
     const dayName = DIES[targetDay];
     const first   = getNextWeekday(targetDay);
     const dates   = [first, addWeeks(first, 1), addWeeks(first, 2), addWeeks(first, 3)];
     const labels  = [`Aquest ${dayName}`, "+1 Setmana", "+2 Setmanes", "+3 Setmanes"];
-    return dates.map((value, i) => ({ label: labels[i], value }));
+    return [
+      ...dates.map((value, i) => ({ label: labels[i], value })),
+      { label: "Altra data", value: "other" },
+    ];
   };
 
   const handleDateOption = (value) => {
