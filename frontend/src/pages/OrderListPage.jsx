@@ -512,7 +512,7 @@ function OrderListPage() {
                   setSortForPrint(false);
                 }, { once: true });
                 document.title = ' ';
-                window.print();
+                requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
               }}
               className="p-2.5 rounded-xl hover:bg-stone-50 transition-colors"
               title="Imprimir">
