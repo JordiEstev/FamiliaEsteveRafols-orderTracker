@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ChevronRight, Pencil, Plus as PlusIcon, Check, Calendar } from "lucide-react";
 import FruitSelectorModal from "../components/FruitSelectorModal";
-import { PLACES, renderFruitLabel, renderFruitDetails, getWeekdayForPlace } from "../utils/fruit";
+import { PLACES, renderFruitLabel, renderFruitDetails, getScrollDates } from "../utils/fruit";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -26,47 +26,9 @@ function getMadridDateStr(offsetDays = 0) {
   return `${r.getUTCFullYear()}-${String(r.getUTCMonth()+1).padStart(2,'0')}-${String(r.getUTCDate()).padStart(2,'0')}`;
 }
 
-function getNextWeekday(targetDay) {
-  const base = new Date().toLocaleDateString('sv', { timeZone: 'Europe/Madrid' });
-  const [y, m, d] = base.split('-').map(Number);
-  const todayUTC = new Date(Date.UTC(y, m - 1, d));
-  const todayDow = todayUTC.getUTCDay();
-  const diff = (targetDay - todayDow + 7) % 7 || 7; // minimum 1 day (next occurrence)
-  const r = new Date(Date.UTC(y, m - 1, d + diff));
-  return `${r.getUTCFullYear()}-${String(r.getUTCMonth()+1).padStart(2,'0')}-${String(r.getUTCDate()).padStart(2,'0')}`;
-}
-
 function todayStr()    { return getMadridDateStr(0); }
 function tomorrowStr() { return getMadridDateStr(1); }
 
-function ddmm(dateStr) {
-  if (!dateStr) return "";
-  const [, m, d] = dateStr.split("-");
-  return `${d}/${m}`;
-}
-
-function addWeeks(dateStr, n) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const r = new Date(Date.UTC(y, m - 1, d + n * 7));
-  return `${r.getUTCFullYear()}-${String(r.getUTCMonth()+1).padStart(2,'0')}-${String(r.getUTCDate()).padStart(2,'0')}`;
-}
-
-function addDaysToDate(dateStr, n) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const r = new Date(Date.UTC(y, m - 1, d + n));
-  return `${r.getUTCFullYear()}-${String(r.getUTCMonth()+1).padStart(2,'0')}-${String(r.getUTCDate()).padStart(2,'0')}`;
-}
-
-// Returns today if today matches targetDay, otherwise next occurrence
-function getThisOrNextWeekday(targetDay) {
-  const base = new Date().toLocaleDateString('sv', { timeZone: 'Europe/Madrid' });
-  const [y, m, d] = base.split('-').map(Number);
-  const todayUTC = new Date(Date.UTC(y, m - 1, d));
-  const diff = (targetDay - todayUTC.getUTCDay() + 7) % 7;
-  if (diff === 0) return base;
-  const r = new Date(Date.UTC(y, m - 1, d + diff));
-  return `${r.getUTCFullYear()}-${String(r.getUTCMonth()+1).padStart(2,'0')}-${String(r.getUTCDate()).padStart(2,'0')}`;
-}
 
 function formatDisplayDate(dateStr) {
   if (!dateStr) return "";
@@ -139,46 +101,6 @@ export default function AddOrderWizard() {
   const handlePlaceSelect = (place) => {
     setOrder(prev => ({ ...prev, place, date: "" }));
     goTo(3);
-  };
-
-  const getDateOptions = () => {
-    // Sant Pau: 3 weekends of Sat+Sun pairs (includes today if today is Sat/Sun)
-    if (order.place === "Sant Pau") {
-      const sat0 = getThisOrNextWeekday(6);
-      const ann  = (d) => { const t = todayStr(), tm = tomorrowStr(); return d === t ? " (Avui)" : d === tm ? " (Demà)" : ""; };
-      const sun1 = addDaysToDate(sat0, 1);
-      return [
-        { label: `Aquest dissabte${ann(sat0)}`,   value: sat0 },
-        { label: `Aquest diumenge${ann(sun1)}`,   value: sun1 },
-        { label: `Dissabte següent${ann(addDaysToDate(sat0, 7))}`,  value: addDaysToDate(sat0, 7) },
-        { label: `Diumenge següent${ann(addDaysToDate(sat0, 8))}`,  value: addDaysToDate(sat0, 8) },
-        { label: `Dissabte${ann(addDaysToDate(sat0, 14))}`,         value: addDaysToDate(sat0, 14) },
-        { label: `Diumenge${ann(addDaysToDate(sat0, 15))}`,         value: addDaysToDate(sat0, 15) },
-        { label: "Altra data",                    value: "other" },
-      ];
-    }
-
-    const targetDay = getWeekdayForPlace(order.place);
-
-    if (targetDay === null) {
-      // Cantallops: any day
-      return [
-        { label: "Avui",       value: todayStr() },
-        { label: "Demà",       value: tomorrowStr() },
-        { label: "Altra data", value: "other" },
-      ];
-    }
-
-    // La Girada / El Pla / Puigdalber: 4 weekday dates + calendar
-    const dayName = DIES[targetDay];
-    const first   = getNextWeekday(targetDay);
-    const ann2    = (d) => { const t = todayStr(), tm = tomorrowStr(); return d === t ? " (Avui)" : d === tm ? " (Demà)" : ""; };
-    const dates   = [first, addWeeks(first, 1), addWeeks(first, 2), addWeeks(first, 3)];
-    const labels  = [`Aquest ${dayName}`, "+1 Setmana", "+2 Setmanes", "+3 Setmanes"];
-    return [
-      ...dates.map((value, i) => ({ label: `${labels[i]}${ann2(value)}`, value })),
-      { label: "Altra data", value: "other" },
-    ];
   };
 
   const handleDateOption = (value) => {
@@ -318,8 +240,6 @@ export default function AddOrderWizard() {
     );
   }
 
-  const dateOptions = getDateOptions();
-
   // ── Wizard ───────────────────────────────────────────────────────────────
 
   return (
@@ -447,37 +367,11 @@ export default function AddOrderWizard() {
                   <p className="text-stone-400 text-sm mb-6">
                     Lloc: <span className="text-amber-400 font-medium">{order.place}</span>
                   </p>
-                  <div className="flex flex-col gap-2.5">
-                    {dateOptions.map(opt => {
-                      const isOther  = opt.value === "other";
-                      const isActive = !isOther && order.date === opt.value;
-                      return (
-                        <button
-                          key={opt.value}
-                          onClick={() => handleDateOption(opt.value)}
-                          className="w-full rounded-2xl px-5 py-4 text-left font-semibold text-base transition-all active:scale-[0.98] flex items-center justify-between"
-                          style={
-                            isActive
-                              ? { backgroundColor: "#F59E0B", color: "#1C1917", border: "1.5px solid #F59E0B" }
-                              : isOther
-                                ? { backgroundColor: "transparent", color: "#A8A29E", border: "1.5px dashed #44403C" }
-                                : { backgroundColor: "#1C1917",    color: "#D6D3D1", border: "1.5px solid #44403C" }
-                          }
-                        >
-                          <span className="flex items-center gap-2.5">
-                            {isOther && <Calendar className="w-4 h-4 flex-shrink-0" />}
-                            {opt.label}
-                          </span>
-                          {isActive && <Check className="w-5 h-5 flex-shrink-0" />}
-                          {!isActive && !isOther && (
-                            <span className="text-xs font-normal" style={{ color: "#78716C" }}>
-                              {ddmm(opt.value)}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <DateScrollList
+                    place={order.place}
+                    selectedDate={order.date}
+                    onSelect={handleDateOption}
+                  />
                   <AnimatePresence>
                     {showOtherDate && (
                       <motion.div
@@ -654,6 +548,85 @@ export default function AddOrderWizard() {
         onAdd={handleFruitSave}
         editItem={editingFruit}
       />
+    </div>
+  );
+}
+
+// ── DateScrollList ────────────────────────────────────────────────────────────
+
+const DIES_SCROLL = ["Diumenge","Dilluns","Dimarts","Dimecres","Dijous","Divendres","Dissabte"];
+
+function DateScrollList({ place, selectedDate, onSelect }) {
+  const dates = getScrollDates(place);
+  const today    = new Date().toLocaleDateString('sv', { timeZone: 'Europe/Madrid' });
+  const [ty, tm, td] = today.split('-').map(Number);
+  const tomorrowDt = new Date(Date.UTC(ty, tm - 1, td + 1));
+  const tomorrow = `${tomorrowDt.getUTCFullYear()}-${String(tomorrowDt.getUTCMonth()+1).padStart(2,'0')}-${String(tomorrowDt.getUTCDate()).padStart(2,'0')}`;
+
+  const selectedRef = useRef(null);
+
+  useEffect(() => {
+    if (selectedRef.current) {
+      selectedRef.current.scrollIntoView({ block: 'center', behavior: 'instant' });
+    }
+  }, []);
+
+  return (
+    <div>
+      <div
+        className="overflow-y-auto rounded-2xl border border-stone-700"
+        style={{ maxHeight: "320px", scrollSnapType: "y mandatory" }}
+      >
+        {dates.map((dateStr) => {
+          const isSelected = dateStr === selectedDate;
+          const dow = new Date(dateStr + "T00:00:00").getDay();
+          const dowName = DIES_SCROLL[dow];
+          const [, mm, dd] = dateStr.split('-');
+          const datePart = `${parseInt(dd)}/${parseInt(mm)}`;
+
+          let mainLabel;
+          if (dateStr === today)
+            mainLabel = `Aquest ${dowName.toLowerCase()} (Avui)`;
+          else if (dateStr === tomorrow)
+            mainLabel = `Aquest ${dowName.toLowerCase()} (Demà)`;
+          else
+            mainLabel = dowName;
+
+          return (
+            <button
+              key={dateStr}
+              ref={isSelected ? selectedRef : null}
+              onClick={() => onSelect(dateStr)}
+              className="w-full px-5 py-4 flex items-center justify-between border-b border-stone-800 last:border-b-0 transition-colors active:opacity-80"
+              style={{
+                scrollSnapAlign: 'start',
+                backgroundColor: isSelected ? '#F59E0B' : 'transparent',
+              }}
+            >
+              <span
+                className="font-semibold text-base"
+                style={{ color: isSelected ? '#1C1917' : '#A8A29E' }}
+              >
+                {mainLabel}
+              </span>
+              <span
+                className="text-sm font-medium"
+                style={{ color: isSelected ? '#292524' : '#57534E' }}
+              >
+                {datePart}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <button
+        onClick={() => onSelect("other")}
+        className="w-full mt-2.5 rounded-2xl px-5 py-4 text-left font-semibold text-base transition-all active:scale-[0.98] flex items-center gap-2.5"
+        style={{ backgroundColor: "transparent", color: "#A8A29E", border: "1.5px dashed #44403C" }}
+      >
+        <Calendar className="w-4 h-4 flex-shrink-0" />
+        Altra data
+      </button>
     </div>
   );
 }

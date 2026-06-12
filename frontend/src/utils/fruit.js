@@ -47,6 +47,33 @@ export function renderFruitDetails(item) {
   return `${item.qty}`;
 }
 
+// Place → valid weekdays (0=Sun … 6=Sat)
+export const PLACE_WEEKDAYS = {
+  "Sant Pau":   [0, 6],
+  "La Girada":  [3],
+  "Puigdalber": [3],
+  "El Pla":     [3],
+  "Cantallops": [0, 1, 2, 3, 4, 5, 6],
+};
+
+// Returns array of date strings (YYYY-MM-DD) for the next 30 calendar days
+// filtered to the weekdays valid for the given place.
+export function getScrollDates(place) {
+  const validDays = PLACE_WEEKDAYS[place] ?? [0, 1, 2, 3, 4, 5, 6];
+  const todayBase = new Date().toLocaleDateString('sv', { timeZone: 'Europe/Madrid' });
+  const [y, m, d] = todayBase.split('-').map(Number);
+  const result = [];
+  for (let i = 0; i < 30; i++) {
+    const dt = new Date(Date.UTC(y, m - 1, d + i));
+    if (validDays.includes(dt.getUTCDay())) {
+      result.push(
+        `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`
+      );
+    }
+  }
+  return result;
+}
+
 // Day-of-week → available places (0=Sun, 6=Sat)
 const PLACES_FOR_DAY = {
   0: ["Sant Pau", "Cantallops"],

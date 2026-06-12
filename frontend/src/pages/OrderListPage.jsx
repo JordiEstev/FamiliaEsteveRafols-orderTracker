@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, Package, Pencil, Trash2, Sheet, Printer, ClockArrowDown, ClockArrowUp,
@@ -111,6 +112,7 @@ function OrderListPage() {
     try { const v = JSON.parse(sessionStorage.getItem("olist_filters") || "{}").sortNewestFirst; return v ?? true; } catch { return true; }
   });
   const [hidePicked, setHidePicked] = useState(false);
+  const [sortForPrint, setSortForPrint] = useState(false);
 
   const [showSummary, setShowSummary]     = useState(false);
   const [expandedFruits, setExpandedFruits] = useState(new Set());
@@ -302,6 +304,10 @@ function OrderListPage() {
       ? new Date(b.created_at) - new Date(a.created_at)
       : new Date(a.created_at) - new Date(b.created_at)
     );
+
+  const displayOrders = sortForPrint
+    ? [...filteredOrders].sort((a, b) => a.customer.localeCompare(b.customer, 'ca'))
+    : filteredOrders;
 
   const fruitSummary = {
     pressecs: {}, pressecsGrouped: {},
@@ -500,7 +506,11 @@ function OrderListPage() {
             </button>
             <button
               onClick={() => {
-                window.addEventListener('afterprint', () => { document.title = 'Comandes'; }, { once: true });
+                flushSync(() => setSortForPrint(true));
+                window.addEventListener('afterprint', () => {
+                  document.title = 'Comandes';
+                  setSortForPrint(false);
+                }, { once: true });
                 document.title = ' ';
                 window.print();
               }}
@@ -632,7 +642,7 @@ function OrderListPage() {
           ) : (
             <motion.div layout>
               <AnimatePresence mode="popLayout">
-                {filteredOrders.map(order => (
+                {displayOrders.map(order => (
                   <motion.div
                     key={order.id} layout
                     initial={{ opacity: 0, y: sortNewestFirst ? 16 : -16 }}
