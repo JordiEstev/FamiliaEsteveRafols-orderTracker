@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef } from 'react';
-import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, Package, Pencil, Trash2, Sheet, Printer, ClockArrowDown, ClockArrowUp,
@@ -112,7 +111,6 @@ function OrderListPage() {
     try { const v = JSON.parse(sessionStorage.getItem("olist_filters") || "{}").sortNewestFirst; return v ?? true; } catch { return true; }
   });
   const [hidePicked, setHidePicked] = useState(false);
-  const [sortForPrint, setSortForPrint] = useState(false);
 
   const [showSummary, setShowSummary]     = useState(false);
   const [expandedFruits, setExpandedFruits] = useState(new Set());
@@ -305,9 +303,7 @@ function OrderListPage() {
       : new Date(a.created_at) - new Date(b.created_at)
     );
 
-  const displayOrders = sortForPrint
-    ? [...filteredOrders].sort((a, b) => a.customer.localeCompare(b.customer, 'ca'))
-    : filteredOrders;
+  const printOrders = [...filteredOrders].sort((a, b) => a.customer.localeCompare(b.customer, 'ca'));
 
   const fruitSummary = {
     pressecs: {}, pressecsGrouped: {},
@@ -506,13 +502,9 @@ function OrderListPage() {
             </button>
             <button
               onClick={() => {
-                flushSync(() => setSortForPrint(true));
-                window.addEventListener('afterprint', () => {
-                  document.title = 'Comandes';
-                  setSortForPrint(false);
-                }, { once: true });
+                window.addEventListener('afterprint', () => { document.title = 'Comandes'; }, { once: true });
                 document.title = ' ';
-                requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+                window.print();
               }}
               className="p-2.5 rounded-xl hover:bg-stone-50 transition-colors"
               title="Imprimir">
@@ -640,9 +632,10 @@ function OrderListPage() {
               <p className="text-xs text-stone-400 mt-1">Afegeix la primera comanda del dia</p>
             </div>
           ) : (
-            <motion.div layout>
+            <>
+            <motion.div layout className="print:hidden">
               <AnimatePresence mode="popLayout">
-                {displayOrders.map(order => (
+                {filteredOrders.map(order => (
                   <motion.div
                     key={order.id} layout
                     initial={{ opacity: 0, y: sortNewestFirst ? 16 : -16 }}
@@ -720,6 +713,30 @@ function OrderListPage() {
                 ))}
               </AnimatePresence>
             </motion.div>
+
+            {/* Print-only list: pre-sorted alphabetically, no animations */}
+            <div className="hidden print:block">
+              {printOrders.map(order => (
+                <div
+                  key={order.id}
+                  className="order-card bg-white rounded-2xl shadow-sm mb-3 overflow-hidden"
+                  style={{ border: "1px solid #F5F5F4", borderLeft: `4px solid ${(STATUS_CONFIG[order.status] || STATUS_CONFIG.pending).color}` }}
+                >
+                  <div className="order-card-inner p-4">
+                    <div className="flex items-start gap-2 mb-2">
+                      <span className="order-card-check" />
+                      <span className="order-card-customer font-bold text-stone-900 text-base leading-tight">{order.customer}</span>
+                    </div>
+                    <div className="order-card-fruits space-y-0.5">
+                      {groupedFruits(order.fruits).map(({ key, text }) => (
+                        <div key={key} className="order-card-fruit-item text-sm text-stone-600">{text}</div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
           )}
 
           {/* ── Print-only summary ── */}
