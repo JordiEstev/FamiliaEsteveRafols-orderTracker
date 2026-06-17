@@ -455,7 +455,7 @@ export default function AddOrderWizard() {
 
               {/* ── Pas 5: Resum ── */}
               {step === 5 && (
-                <div>
+                <div className="pb-32">
                   <h2 className="text-2xl font-bold text-white mb-1">Resum de la comanda</h2>
                   <p className="text-stone-400 text-sm mb-6">Revisa les dades abans de guardar.</p>
 
@@ -522,17 +522,6 @@ export default function AddOrderWizard() {
                   {saveError && (
                     <p className="text-red-400 text-sm mb-4 text-center">{saveError}</p>
                   )}
-
-                  <button
-                    onClick={handleSubmit}
-                    disabled={saving}
-                    className="w-full rounded-2xl py-4 font-bold text-stone-900 text-lg flex items-center justify-center gap-2 active:scale-95 transition-all"
-                    style={{ backgroundColor: saving ? "#92400e" : "#F59E0B", color: "#1C1917" }}
-                    onMouseEnter={e => { if (!saving) e.currentTarget.style.backgroundColor = "#D97706"; }}
-                    onMouseLeave={e => { if (!saving) e.currentTarget.style.backgroundColor = "#F59E0B"; }}
-                  >
-                    {saving ? "Guardant..." : "Guardar comanda"}
-                  </button>
                 </div>
               )}
 
@@ -540,6 +529,24 @@ export default function AddOrderWizard() {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {/* ── Botó flotant "Guardar" (pas 5) ── */}
+      {step === 5 && (
+        <div className="fixed bottom-0 inset-x-0 z-20 px-5 pb-6 pt-3 bg-gradient-to-t from-stone-950 via-stone-950/95 to-transparent">
+          <div className="max-w-md mx-auto">
+            <button
+              onClick={handleSubmit}
+              disabled={saving}
+              className="w-full rounded-2xl py-4 font-bold text-stone-900 text-lg flex items-center justify-center gap-2 active:scale-95 transition-all"
+              style={{ backgroundColor: saving ? "#92400e" : "#F59E0B", color: "#1C1917" }}
+              onMouseEnter={e => { if (!saving) e.currentTarget.style.backgroundColor = "#D97706"; }}
+              onMouseLeave={e => { if (!saving) e.currentTarget.style.backgroundColor = "#F59E0B"; }}
+            >
+              {saving ? "Guardant..." : "Guardar comanda"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <FruitSelectorModal
         key={editingFruit ? `edit-${editingFruit.id}` : 'new'}
