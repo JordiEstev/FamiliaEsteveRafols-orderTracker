@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { v4 as uuid } from "uuid";
 import { ArrowLeft, ChevronRight, Pencil, Plus as PlusIcon, Check } from "lucide-react";
 import FruitSelectorModal from "../components/FruitSelectorModal";
 import DateScrollList from "../components/DateScrollList";
@@ -58,14 +59,18 @@ export default function AddOrderWizard() {
   const returnPath = prefill.returnPath ?? "/";
 
   const [step, setStep] = useState(
-    prefill.prefillCustomer && prefill.prefillCustomer.trim().length >= 2 ? 2 : 1
+    prefill.prefillStep
+      ? prefill.prefillStep
+      : (prefill.prefillCustomer && prefill.prefillCustomer.trim().length >= 2 ? 2 : 1)
   );
   const [dir,  setDir]  = useState(1);
   const [order, setOrder] = useState({
     customer: prefill.prefillCustomer || "",
     place:    prefill.prefillPlace || "",
     date:     prefill.prefillDate  || "",
-    fruits:   [],
+    fruits:   (prefill.prefillFruits || []).map(f => ({
+      fruit: f.fruit, size: f.size ?? null, qty: f.qty, weight: f.weight ?? null, id: f.id ?? uuid(),
+    })),
     notes:    "",
   });
   const [customerError, setCustomerError] = useState("");

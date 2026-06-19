@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, Package, Pencil, Trash2, Sheet, Printer, ClockArrowDown, ClockArrowUp,
-  ClipboardList, ChevronDown, Copy, Check, ArrowUp,
+  ClipboardList, ChevronDown, Copy, Check, ArrowUp, Repeat,
 } from "lucide-react";
 import PickupToast from "../components/PickupToast";
 import * as XLSX from 'xlsx';
@@ -272,6 +272,21 @@ function OrderListPage() {
     const { customerName, place, date } = pendingPickup;
     setPendingPickup(null);
     navigate('/add', { state: { prefillCustomer: customerName, prefillPlace: place, prefillDate: date, returnPath: '/' } });
+  };
+
+  // Repetir una comanda recollida: obre el wizard directament al resum (pas 5)
+  // amb el mateix client, lloc i fruita, i la mateixa data + 1 setmana.
+  const handleRepeatOrder = (order) => {
+    navigate('/add', {
+      state: {
+        prefillCustomer: order.customer,
+        prefillPlace:    order.place,
+        prefillDate:     addDays(order.date, 7),
+        prefillFruits:   order.fruits,
+        prefillStep:     5,
+        returnPath:      '/',
+      },
+    });
   };
 
   const handleStatusUpdate = (orderId, newStatus) => {
@@ -744,6 +759,15 @@ function OrderListPage() {
                             </button>
                           );
                         })()}
+                        {order.status === "picked_up" && (
+                          <button
+                            onClick={() => handleRepeatOrder(order)}
+                            className="flex-1 px-3 py-2 rounded-xl text-xs font-semibold border transition-colors flex items-center justify-center gap-1.5"
+                            style={{ backgroundColor: "#FEF3C7", color: "#B45309", borderColor: "#FCD34D" }}
+                          >
+                            <Repeat className="w-3.5 h-3.5" /> Repetir
+                          </button>
+                        )}
                         {order.status !== "cancelled" && order.status !== "picked_up" && (
                           <button
                             onClick={() => handleStatusUpdate(order.id, "cancelled")}
