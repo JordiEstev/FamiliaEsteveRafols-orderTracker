@@ -330,17 +330,43 @@ export default function EditOrderPage() {
                 <ChevronDown className={`w-4 h-4 text-stone-400 transition-transform ${dateOpen ? "rotate-180" : ""}`} />
               </button>
               {dateOpen && (
-                <div className="pt-2">
-                  <DateScrollList place={form.place} selectedDate={form.date} onSelect={handleDateSelect} />
-                  {showOtherDate && (
-                    <input
-                      ref={otherDateRef}
-                      type="date"
-                      value={form.date || ""}
-                      onChange={handleOtherDateChange}
-                      className="w-full mt-2.5 rounded-xl border border-stone-700 bg-stone-800 px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
-                    />
-                  )}
+                <div
+                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+                  onClick={() => setDateOpen(false)}
+                >
+                  <div
+                    className="w-full max-w-md rounded-2xl bg-stone-900 border border-stone-700 p-5 shadow-2xl"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-base font-bold text-gray-100">Tria una data</h3>
+                      <button
+                        type="button"
+                        onClick={() => setDateOpen(false)}
+                        className="w-8 h-8 flex items-center justify-center rounded-full text-stone-400 hover:text-stone-200 hover:bg-stone-700 transition-colors text-lg"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                    <DateScrollList place={form.place} selectedDate={form.date} onSelect={handleDateSelect} />
+                    {showOtherDate && (
+                      <input
+                        ref={otherDateRef}
+                        type="date"
+                        value={form.date || ""}
+                        onChange={handleOtherDateChange}
+                        className="w-full mt-2.5 rounded-xl border border-stone-700 bg-stone-800 px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setDateOpen(false)}
+                      className="w-full mt-4 rounded-xl py-3 font-semibold text-stone-900"
+                      style={{ backgroundColor: "#F59E0B" }}
+                    >
+                      Fet
+                    </button>
+                  </div>
                 </div>
               )}
             </>
