@@ -92,11 +92,12 @@ export default function EditOrderPage() {
     })
       .then(res => { if (!res.ok) throw new Error(); return res.json(); })
       .then(data => { setSavedOrder(data); })
-      .catch(() => {
-        // Sense cobertura el service worker encua el PUT (backgroundSync) i el
-        // reenvia sol quan torni la connexió, però el fetch rebutja igualment.
-        // No és un error: mostrem una confirmació d'encuat en comptes del toast.
-        if (!navigator.onLine) {
+      .catch((err) => {
+        // Sense cobertura, Workbox encua el PUT (backgroundSync) i rejoint el fetch.
+        // Detectem "sense resposta HTTP" (TypeError) com a senyal que l'ha encuat,
+        // o comprovem navigator.onLine directament.
+        const isOfflineError = err instanceof TypeError || !navigator.onLine;
+        if (isOfflineError) {
           setSavedOrder({ ...payload, offline: true });
           return;
         }

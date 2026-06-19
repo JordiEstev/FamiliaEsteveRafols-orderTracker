@@ -261,11 +261,12 @@ function OrderListPage() {
 
   const confirmDeleteNow = (orderId) => {
     fetch(`${import.meta.env.VITE_API_URL}/orders/${orderId}`, { method: "DELETE" })
-      .catch(() => {
+      .catch((err) => {
         // Sense cobertura el service worker encua el DELETE (backgroundSync) i el
         // reenvia quan torni la connexió. La comanda ja s'ha tret de la llista de
         // forma optimista, així que no és un error: no mostrem el toast.
-        if (!navigator.onLine) return;
+        const isOfflineError = err instanceof TypeError || !navigator.onLine;
+        if (isOfflineError) return;
         setError("Error eliminant la comanda.");
       });
   };
