@@ -78,19 +78,30 @@ export default function EditOrderPage() {
     setSaving(true);
     setErrorMessage("");
 
+    const payload = {
+      ...form,
+      fruits: fruits.map(f => ({
+        fruit: f.fruit, qty: f.qty, size: f.size ?? null, weight: f.weight ?? null,
+      })),
+    };
+
     fetch(`${import.meta.env.VITE_API_URL}/orders/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...form,
-        fruits: fruits.map(f => ({
-          fruit: f.fruit, qty: f.qty, size: f.size ?? null, weight: f.weight ?? null,
-        })),
-      }),
+      body: JSON.stringify(payload),
     })
       .then(res => { if (!res.ok) throw new Error(); return res.json(); })
       .then(data => { setSavedOrder(data); })
-      .catch(() => setErrorMessage("Error en actualitzar la comanda."))
+      .catch(() => {
+        // Sense cobertura el service worker encua el PUT (backgroundSync) i el
+        // reenvia sol quan torni la connexió, però el fetch rebutja igualment.
+        // No és un error: mostrem una confirmació d'encuat en comptes del toast.
+        if (!navigator.onLine) {
+          setSavedOrder({ ...payload, offline: true });
+          return;
+        }
+        setErrorMessage("Error en actualitzar la comanda.");
+      })
       .finally(() => setSaving(false));
   };
 
@@ -126,14 +137,28 @@ export default function EditOrderPage() {
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: "spring", stiffness: 280, damping: 18 }}
-              className="w-20 h-20 rounded-full bg-green-600 flex items-center justify-center shadow-xl shadow-green-950/60"
+              className={`w-20 h-20 rounded-full flex items-center justify-center shadow-xl ${savedOrder.offline ? "bg-amber-500 shadow-amber-950/60" : "bg-green-600 shadow-green-950/60"}`}
             >
-              <svg viewBox="0 0 24 24" fill="none" className="w-10 h-10" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
+              {savedOrder.offline ? (
+                <svg viewBox="0 0 24 24" fill="none" className="w-10 h-10" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="9" />
+                  <polyline points="12 7 12 12 15 14" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" className="w-10 h-10" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              )}
             </motion.div>
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-              <div className="text-2xl font-bold text-white">Comanda actualitzada</div>
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="text-center">
+              <div className="text-2xl font-bold text-white">
+                {savedOrder.offline ? "Canvis encuats" : "Comanda actualitzada"}
+              </div>
+              {savedOrder.offline && (
+                <div className="text-sm text-amber-300/90 mt-1.5 max-w-xs mx-auto leading-snug">
+                  Sense cobertura. Es desarà automàticament quan tornis a tenir connexió.
+                </div>
+              )}
             </motion.div>
           </div>
 
