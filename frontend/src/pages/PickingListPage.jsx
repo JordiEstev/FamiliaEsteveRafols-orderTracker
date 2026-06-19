@@ -184,6 +184,7 @@ export default function PickingListPage() {
       message: "Marcat com a recollit",
       firstCustPlace: firstOrder?.place || filterPlace,
       firstCustDate:  firstOrder?.date  || filterDate,
+      fruits: grouped[cust].flatMap(o => o.fruits),
     });
   };
 
@@ -198,10 +199,18 @@ export default function PickingListPage() {
     pickupTimerRef.current = null;
     if (!pendingPickup) return;
     confirmPickupApi(pendingPickup.orderIds);
-    const { customerName, firstCustPlace, firstCustDate } = pendingPickup;
+    const { customerName, firstCustPlace, firstCustDate, fruits } = pendingPickup;
     setPendingPickup(null);
+    // Va directe al resum amb el mateix client, lloc i fruita, i la data + 1 setmana.
     navigate('/add', {
-      state: { prefillCustomer: customerName, prefillPlace: firstCustPlace, prefillDate: firstCustDate, returnPath: '/picking' },
+      state: {
+        prefillCustomer: customerName,
+        prefillPlace:    firstCustPlace,
+        prefillDate:     addDays(firstCustDate, 7),
+        prefillFruits:   fruits || [],
+        prefillStep:     5,
+        returnPath:      '/picking',
+      },
     });
   };
 
