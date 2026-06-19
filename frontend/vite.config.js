@@ -10,6 +10,11 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
+        // En recarregar sense xarxa, servim sempre l'index.html des de la
+        // precaché perquè la SPA carregui offline a qualsevol ruta (/, /add,
+        // /edit/:id...). Sense això el navegador mostra la seva pàgina d'error.
+        navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/orders/],
         runtimeCaching: [
           // Cacheja els GET de /orders durant 5 minuts perquè la llista i la
           // pantalla d'edició es puguin obrir sense connexió.
