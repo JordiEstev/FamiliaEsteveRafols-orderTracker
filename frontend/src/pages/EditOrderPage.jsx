@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Pencil, ArrowLeft } from "lucide-react";
+import { Pencil, ArrowLeft, ChevronDown } from "lucide-react";
 import { v4 as uuid } from "uuid";
 import FruitSelectorModal from "../components/FruitSelectorModal";
 import DateScrollList from "../components/DateScrollList";
@@ -49,6 +49,7 @@ export default function EditOrderPage() {
   const [savedOrder, setSavedOrder]         = useState(null);
   const [saving, setSaving]                 = useState(false);
   const [showOtherDate, setShowOtherDate]   = useState(false);
+  const [dateOpen, setDateOpen]             = useState(false);
   const otherDateRef = useRef(null);
 
   // Carrega la comanda. Si la llista ens l'ha passada per state, l'usem
@@ -102,9 +103,12 @@ export default function EditOrderPage() {
 
   const handlePlaceChange = (e) => {
     const place = e.target.value;
-    // La data depèn del lloc: si la que hi ha ja no és vàlida, l'esborrem.
-    setForm(prev => ({ ...prev, place, date: isDateValidForPlace(prev.date, place) ? prev.date : "" }));
+    // La data depèn del lloc: si la que hi ha ja no és vàlida, l'esborrem i obrim
+    // la roda perquè se'n triï una de nova.
+    const keepDate = isDateValidForPlace(form.date, place);
+    setForm(prev => ({ ...prev, place, date: keepDate ? prev.date : "" }));
     setShowOtherDate(false);
+    if (!keepDate) setDateOpen(true);
   };
 
   const handleDateSelect = (value) => {
@@ -314,18 +318,30 @@ export default function EditOrderPage() {
           <label className="text-xs uppercase tracking-wide text-stone-400 font-medium">Data</label>
           {form.place ? (
             <>
-              <DateScrollList place={form.place} selectedDate={form.date} onSelect={handleDateSelect} />
-              {showOtherDate && (
-                <input
-                  ref={otherDateRef}
-                  type="date"
-                  value={form.date || ""}
-                  onChange={handleOtherDateChange}
-                  className="w-full mt-2.5 rounded-xl border border-stone-700 bg-stone-800 px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
-                />
-              )}
-              {form.date && (
-                <p className="text-xs text-amber-400/90 font-medium pt-0.5">Triada: {formatDisplayDate(form.date)}</p>
+              {/* Camp tancat amb la data triada; la roda apareix en clicar-hi. */}
+              <button
+                type="button"
+                onClick={() => setDateOpen(o => !o)}
+                className="w-full flex items-center justify-between rounded-xl border border-stone-700 bg-stone-800 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 transition-all"
+              >
+                <span className={form.date ? "text-gray-100 font-medium" : "text-stone-500"}>
+                  {form.date ? formatDisplayDate(form.date) : "Tria una data"}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-stone-400 transition-transform ${dateOpen ? "rotate-180" : ""}`} />
+              </button>
+              {dateOpen && (
+                <div className="pt-2">
+                  <DateScrollList place={form.place} selectedDate={form.date} onSelect={handleDateSelect} />
+                  {showOtherDate && (
+                    <input
+                      ref={otherDateRef}
+                      type="date"
+                      value={form.date || ""}
+                      onChange={handleOtherDateChange}
+                      className="w-full mt-2.5 rounded-xl border border-stone-700 bg-stone-800 px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
+                    />
+                  )}
+                </div>
               )}
             </>
           ) : (
