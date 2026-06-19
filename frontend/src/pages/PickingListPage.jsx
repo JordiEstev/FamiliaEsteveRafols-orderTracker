@@ -107,27 +107,23 @@ export default function PickingListPage() {
     return () => { if (pickupTimerRef.current) clearTimeout(pickupTimerRef.current); };
   }, []);
 
-  // ── Grouping ──────────────────────────────────────────────────────────────
+  // ── Llista (comandes separades, no agrupades per client) ───────────────────
 
-  const grouped = {};
-  for (const order of orders) {
-    if (!grouped[order.customer]) grouped[order.customer] = [];
-    grouped[order.customer].push(order);
-  }
-  const customers = Object.keys(grouped).sort();
+  const sortedOrders = [...orders].sort((a, b) =>
+    a.customer.localeCompare(b.customer, 'ca') || (a.id - b.id)
+  );
 
-  const visibleCustomers = customers.filter(c => {
-    if (search && !c.toLowerCase().includes(search.toLowerCase())) return false;
+  const visibleOrders = sortedOrders.filter(o => {
+    if (search && !o.customer.toLowerCase().includes(search.toLowerCase())) return false;
     if (hideDone) {
-      const allPickedUp = grouped[c].every(o => o.status === "picked_up");
-      const hasPending = pendingPickup && grouped[c].some(o => pendingPickup.orderIds?.includes(o.id));
-      return !allPickedUp || hasPending;
+      const isPending = pendingPickup && pendingPickup.orderIds?.includes(o.id);
+      return o.status !== "picked_up" || isPending;
     }
     return true;
   });
 
-  const totalCount     = customers.length;
-  const deliveredCount = customers.filter(c => grouped[c].every(o => o.status === "picked_up")).length;
+  const totalCount     = orders.length;
+  const deliveredCount = orders.filter(o => o.status === "picked_up").length;
   const progressPct    = totalCount > 0 ? (deliveredCount / totalCount) * 100 : 0;
 
   // ── Pending summary ───────────────────────────────────────────────────────
@@ -161,9 +157,8 @@ export default function PickingListPage() {
       .catch(() => setError("Error en guardar."));
   };
 
-  const handleMarkCustomerPickedUp = (cust) => {
-    const orderIds = grouped[cust].filter(o => o.status !== "picked_up").map(o => o.id);
-    if (!orderIds.length) return;
+  const handleMarkOrderPickedUp = (order) => {
+    if (order.status === "picked_up") return;
 
     if (pickupTimerRef.current) {
       clearTimeout(pickupTimerRef.current);
@@ -171,20 +166,19 @@ export default function PickingListPage() {
     }
 
     pickupTimerRef.current = setTimeout(() => {
-      confirmPickupApi(orderIds);
+      confirmPickupApi([order.id]);
       setPendingPickup(null);
       pickupTimerRef.current = null;
     }, 3000);
 
-    const firstOrder = grouped[cust][0];
     setPendingPickup({
       id: Date.now(),
-      orderIds,
-      customerName: cust,
+      orderIds: [order.id],
+      customerName: order.customer,
       message: "Marcat com a recollit",
-      firstCustPlace: firstOrder?.place || filterPlace,
-      firstCustDate:  firstOrder?.date  || filterDate,
-      fruits: grouped[cust].flatMap(o => o.fruits),
+      firstCustPlace: order.place || filterPlace,
+      firstCustDate:  order.date  || filterDate,
+      fruits: order.fruits,
     });
   };
 
@@ -307,52 +301,49 @@ export default function PickingListPage() {
           </div>
         ) : error ? (
           <div className="text-center py-16 text-stone-500 text-sm">{error}</div>
-        ) : visibleCustomers.length === 0 ? (
+        ) : visibleOrders.length === 0 ? (
           <div className="text-center py-16 text-stone-500 text-sm">No hi ha comandes per mostrar</div>
         ) : (
-          visibleCustomers.map(customer => {
-            const custOrders  = grouped[customer];
-            const allPickedUp = custOrders.every(o => o.status === "picked_up");
-            const isPending   = !!(pendingPickup && custOrders.some(o => pendingPickup.orderIds?.includes(o.id)));
+          visibleOrders.map(order => {
+            const isPickedUp = order.status === "picked_up";
+            const isPending  = !!(pendingPickup && pendingPickup.orderIds?.includes(order.id));
 
             return (
               <div
-                key={customer}
+                key={order.id}
                 className={`bg-white rounded-2xl border mb-3 overflow-hidden shadow-sm print:shadow-none print:break-inside-avoid transition-all ${
-                  allPickedUp ? "border-emerald-200" : isPending ? "border-amber-300" : "border-stone-200"
+                  isPickedUp ? "border-emerald-200" : isPending ? "border-amber-300" : "border-stone-200"
                 }`}
               >
                 <div className="p-4 pb-3">
                   <h2 className={`text-xl font-extrabold leading-tight mb-3 ${
-                    allPickedUp ? "text-emerald-600 line-through decoration-emerald-300" : "text-stone-900"
+                    isPickedUp ? "text-emerald-600 line-through decoration-emerald-300" : "text-stone-900"
                   }`}>
-                    {customer}
+                    {order.customer}
                   </h2>
                   <div className="space-y-2.5">
-                    {custOrders.flatMap((order, oi) =>
-                      order.fruits.map((fruit, fi) => (
-                        <div key={`${oi}-${fi}`} className="flex items-start gap-2.5">
-                          <span className="text-lg flex-shrink-0 mt-0.5">{FRUIT_EMOJI[fruit.fruit] || "🍓"}</span>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-semibold text-stone-800 leading-snug">{renderFruitLabel(fruit)}</div>
-                            <div className="text-xs text-stone-500 mt-0.5">{renderFruitDetails(fruit)}</div>
-                          </div>
+                    {order.fruits.map((fruit, fi) => (
+                      <div key={fi} className="flex items-start gap-2.5">
+                        <span className="text-lg flex-shrink-0 mt-0.5">{FRUIT_EMOJI[fruit.fruit] || "🍓"}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold text-stone-800 leading-snug">{renderFruitLabel(fruit)}</div>
+                          <div className="text-xs text-stone-500 mt-0.5">{renderFruitDetails(fruit)}</div>
                         </div>
-                      ))
-                    )}
+                      </div>
+                    ))}
                   </div>
                 </div>
 
                 <button
-                  onClick={() => !allPickedUp && !isPending && handleMarkCustomerPickedUp(customer)}
-                  disabled={allPickedUp || isPending}
+                  onClick={() => !isPickedUp && !isPending && handleMarkOrderPickedUp(order)}
+                  disabled={isPickedUp || isPending}
                   className={`no-print w-full py-3.5 text-sm font-bold tracking-wide transition-all ${
-                    allPickedUp   ? "bg-emerald-50 text-emerald-600 cursor-default"
+                    isPickedUp    ? "bg-emerald-50 text-emerald-600 cursor-default"
                     : isPending   ? "bg-amber-50 text-amber-500 cursor-default"
                     : "bg-stone-900 text-white hover:bg-stone-700 active:scale-[0.99]"
                   }`}
                 >
-                  {allPickedUp ? "✓ ENTREGAT" : isPending ? "PENDENT DE CONFIRMAR…" : "MARCAR COM A ENTREGAT"}
+                  {isPickedUp ? "✓ ENTREGAT" : isPending ? "PENDENT DE CONFIRMAR…" : "MARCAR COM A ENTREGAT"}
                 </button>
               </div>
             );
