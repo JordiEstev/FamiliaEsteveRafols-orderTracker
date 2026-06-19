@@ -30,11 +30,17 @@ export function queueCount() {
   return read().length;
 }
 
+// Avisa la UI que el nombre de peticions pendents ha canviat.
+function notifyChanged() {
+  window.dispatchEvent(new CustomEvent("orders-queue-changed", { detail: { count: queueCount() } }));
+}
+
 // item: { method, url, body }  — body és un objecte pla o null (DELETE).
 export function enqueue(item) {
   const items = read();
   items.push({ id: uuid(), ...item });
   write(items);
+  notifyChanged();
 }
 
 let flushing = false;
@@ -69,6 +75,7 @@ export async function flushQueue() {
       }
     }
     write(remaining);
+    if (flushed > 0) notifyChanged();
     return flushed;
   } finally {
     flushing = false;

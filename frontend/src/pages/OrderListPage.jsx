@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx';
 import './OrderListPage.css';
 import { motion, AnimatePresence } from "framer-motion";
 import { renderFruitExportLine, PLACES, getPlacesForDate } from "../utils/fruit";
-import { enqueue } from "../utils/offlineQueue";
+import { enqueue, queueCount } from "../utils/offlineQueue";
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -99,6 +99,8 @@ function OrderListPage() {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState("");
   const [refetchKey, setRefetchKey] = useState(0);
+  const [pendingCount, setPendingCount] = useState(queueCount());
+  const [online, setOnline]       = useState(navigator.onLine);
 
   const [search, setSearch] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem("olist_filters") || "{}").search ?? ""; } catch { return ""; }
@@ -158,6 +160,21 @@ function OrderListPage() {
     const onFlushed = () => setRefetchKey(k => k + 1);
     window.addEventListener("orders-queue-flushed", onFlushed);
     return () => window.removeEventListener("orders-queue-flushed", onFlushed);
+  }, []);
+
+  // Comptador de comandes pendents d'enviar i estat de la connexió.
+  useEffect(() => {
+    const onQueueChanged = () => setPendingCount(queueCount());
+    const onOnline  = () => { setOnline(true); setPendingCount(queueCount()); };
+    const onOffline = () => setOnline(false);
+    window.addEventListener("orders-queue-changed", onQueueChanged);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("orders-queue-changed", onQueueChanged);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
   }, []);
 
   // ── Session & notification effects ────────────────────────────────────────
@@ -554,6 +571,20 @@ function OrderListPage() {
             📋 Llista de Comandes{filterDate ? ` · ${getDateLabelPrint(filterDate)}` : ""}{filterPlace && filterPlace !== "Tots els llocs" ? ` · ${filterPlace}` : ""}
           </div>
 
+          {/* ── Offline / pending-queue banners ── */}
+          {!online && (
+            <div className="flex items-center gap-2 mb-3 px-3.5 py-2.5 rounded-xl bg-stone-100 border border-stone-200 text-stone-600 text-sm font-medium print:hidden">
+              <span className="w-2 h-2 rounded-full bg-stone-400 flex-shrink-0" />
+              Sense connexió. Els canvis es desaran quan tornis a tenir cobertura.
+            </div>
+          )}
+          {pendingCount > 0 && (
+            <div className="flex items-center gap-2 mb-3 px-3.5 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm font-medium print:hidden">
+              <ClockArrowUp className="w-4 h-4 flex-shrink-0" />
+              {pendingCount} {pendingCount === 1 ? "comanda pendent" : "comandes pendents"} d'enviar
+            </div>
+          )}
+
           {/* ── Filter section (non-sticky, gray bg) ── */}
           <div className="bg-gray-50 rounded-2xl p-3 mb-4 border border-stone-100 space-y-2 print:hidden">
             {/* Search */}
@@ -692,7 +723,7 @@ function OrderListPage() {
                         <div className="order-card-notes mb-3 text-xs text-stone-500 italic bg-stone-50 rounded-lg px-3 py-2 border border-stone-100 line-clamp-2">{order.notes.trim()}</div>
                       )}
                       <div className="order-card-actions flex gap-2">
-                        <button onClick={() => navigate(`/edit/${order.id}`, { state: { returnPath: "/" } })}
+                        <button onClick={() => navigate(`/edit/${order.id}`, { state: { returnPath: "/", order } })}
                           className="bg-stone-50 hover:bg-stone-100 text-stone-600 border border-stone-200 px-3 py-2 rounded-xl text-sm flex items-center justify-center gap-1.5 transition-colors font-medium">
                           <Pencil className="w-3.5 h-3.5" />
                         </button>

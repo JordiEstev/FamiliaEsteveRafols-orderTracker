@@ -32,37 +32,51 @@ export default function EditOrderPage() {
   const navigate   = useNavigate();
   const location   = useLocation();
   const returnPath = location.state?.returnPath ?? "/";
+  const prefillOrder = location.state?.order ?? null;
   const { id }     = useParams();
 
   const [form, setForm] = useState({
     customer: "", date: "", place: "", notes: "", status: "pending",
   });
   const [fruits, setFruits]           = useState([]);
-  const [loading, setLoading]         = useState(true);
+  // Si venim de la llista, ja tenim la comanda: l'editem sense esperar cap fetch
+  // (clau per poder editar sense cobertura).
+  const [loading, setLoading]         = useState(!prefillOrder);
   const [openFruitModal, setOpenFruitModal] = useState(false);
   const [editingFruit, setEditingFruit]     = useState(null);
   const [errorMessage, setErrorMessage]     = useState("");
   const [savedOrder, setSavedOrder]         = useState(null);
   const [saving, setSaving]                 = useState(false);
 
-  // Fetch order
+  // Carrega la comanda. Si la llista ens l'ha passada per state, l'usem
+  // directament i evitem el fetch (funciona sense cobertura, sense spinner).
   useEffect(() => {
+    const hydrate = (order) => {
+      setForm({
+        customer: order.customer,
+        date:     order.date,
+        place:    order.place,
+        notes:    order.notes || "",
+        status:   order.status || "pending",
+      });
+      setFruits(order.fruits.map(f => ({ ...f, id: f.id ?? uuid() })));
+      setLoading(false);
+    };
+
+    if (prefillOrder) {
+      hydrate(prefillOrder);
+      return;
+    }
+
     fetch(`${import.meta.env.VITE_API_URL}/orders`)
       .then(res => res.json())
       .then(data => {
         const order = data.find(o => o.id === parseInt(id));
         if (!order) throw new Error("Not found");
-        setForm({
-          customer: order.customer,
-          date:     order.date,
-          place:    order.place,
-          notes:    order.notes || "",
-          status:   order.status || "pending",
-        });
-        setFruits(order.fruits.map(f => ({ ...f, id: f.id ?? uuid() })));
-        setLoading(false);
+        hydrate(order);
       })
       .catch(() => {
+        setLoading(false);
         setErrorMessage("No s'ha pogut carregar la comanda.");
         setTimeout(() => navigate("/"), 2000);
       });
