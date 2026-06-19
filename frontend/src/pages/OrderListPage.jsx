@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx';
 import './OrderListPage.css';
 import { motion, AnimatePresence } from "framer-motion";
 import { renderFruitExportLine, PLACES, getPlacesForDate } from "../utils/fruit";
+import { enqueue } from "../utils/offlineQueue";
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -97,6 +98,7 @@ function OrderListPage() {
   const [orders, setOrders]       = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState("");
+  const [refetchKey, setRefetchKey] = useState(0);
 
   const [search, setSearch] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem("olist_filters") || "{}").search ?? ""; } catch { return ""; }
@@ -149,7 +151,14 @@ function OrderListPage() {
       .then(res => { if (!res.ok) throw new Error(`Server returned ${res.status}`); return res.json(); })
       .then(data => { setOrders(data); setLoading(false); })
       .catch(err => { console.error(err); setError("Error carregant comandes."); setLoading(false); });
-  }, [filterDate, filterPlace]);
+  }, [filterDate, filterPlace, refetchKey]);
+
+  // Quan la cua offline es buida (s'han reenviat comandes), refresquem la llista.
+  useEffect(() => {
+    const onFlushed = () => setRefetchKey(k => k + 1);
+    window.addEventListener("orders-queue-flushed", onFlushed);
+    return () => window.removeEventListener("orders-queue-flushed", onFlushed);
+  }, []);
 
   // ── Session & notification effects ────────────────────────────────────────
 
@@ -263,10 +272,13 @@ function OrderListPage() {
     fetch(`${import.meta.env.VITE_API_URL}/orders/${orderId}`, { method: "DELETE" })
       .catch(err => {
         // Una fallada de xarxa (sense cobertura) fa que fetch rebutgi amb un
-        // TypeError; el service worker encua el DELETE (backgroundSync) i el
-        // reenvia quan torni la connexió. La comanda ja s'ha tret de la llista de
-        // forma optimista, així que no és un error: no mostrem el toast.
-        if (err instanceof TypeError) return;
+        // TypeError: encuem el DELETE localment i el reenviarem quan torni la
+        // connexió. La comanda ja s'ha tret de la llista de forma optimista, així
+        // que no és un error: no mostrem el toast.
+        if (err instanceof TypeError) {
+          enqueue({ method: "DELETE", url: `${import.meta.env.VITE_API_URL}/orders/${orderId}`, body: null });
+          return;
+        }
         setError("Error eliminant la comanda.");
       });
   };

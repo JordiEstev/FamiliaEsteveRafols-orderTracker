@@ -11,11 +11,12 @@ export default defineConfig({
       registerType: 'autoUpdate',
       workbox: {
         runtimeCaching: [
-          // 1. Cachea los GET de /orders durante 5 minutos
+          // Cacheja els GET de /orders durant 5 minuts perquè la llista i la
+          // pantalla d'edició es puguin obrir sense connexió.
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/orders'),
             handler: 'NetworkFirst',
-            method: 'GET', // Específicamos el método
+            method: 'GET',
             options: {
               cacheName: 'orders-cache',
               networkTimeoutSeconds: 5,
@@ -23,42 +24,11 @@ export default defineConfig({
               cacheableResponse: { statuses: [0, 200] },
             },
           },
-          // 2. Encola los POST cuando no hay red
-          {
-            urlPattern: ({ url }) => url.pathname.startsWith('/orders'),
-            handler: 'NetworkOnly',
-            method: 'POST',
-            options: {
-              backgroundSync: {
-                name: 'orders-queue-post',
-                options: { maxRetentionTime: 24 * 60 },
-              },
-            },
-          },
-          // 3. Encola los PUT cuando no hay red
-          {
-            urlPattern: ({ url }) => url.pathname.startsWith('/orders'),
-            handler: 'NetworkOnly',
-            method: 'PUT',
-            options: {
-              backgroundSync: {
-                name: 'orders-queue-put',
-                options: { maxRetentionTime: 24 * 60 },
-              },
-            },
-          },
-          // 4. Encola los DELETE cuando no hay red
-          {
-            urlPattern: ({ url }) => url.pathname.startsWith('/orders'),
-            handler: 'NetworkOnly',
-            method: 'DELETE',
-            options: {
-              backgroundSync: {
-                name: 'orders-queue-delete',
-                options: { maxRetentionTime: 24 * 60 },
-              },
-            },
-          }
+          // Les mutacions (POST/PUT/DELETE) NO les intercepta el service worker:
+          // quan no hi ha xarxa, fetch falla amb un TypeError i la cua offline de
+          // l'app (utils/offlineQueue.js) les desa i les reenvia en reconnectar.
+          // Així no depenem de la Background Sync API, poc fiable i sense suport
+          // a iOS/Safari.
         ],
       },
       manifest: {

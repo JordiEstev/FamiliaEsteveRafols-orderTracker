@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ChevronRight, Pencil, Plus as PlusIcon, Check, Calendar } from "lucide-react";
 import FruitSelectorModal from "../components/FruitSelectorModal";
 import { PLACES, renderFruitLabel, renderFruitDetails, getScrollDates } from "../utils/fruit";
+import { enqueue } from "../utils/offlineQueue";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -164,10 +165,10 @@ export default function AddOrderWizard() {
       setSavedOrder(await res.json());
     } catch (err) {
       // Una fallada de xarxa (sense cobertura) fa que fetch rebutgi amb un
-      // TypeError; el service worker ja ha encuat el POST (backgroundSync) i el
-      // reenviarà sol quan torni la connexió. Un error HTTP del servidor llança
-      // un Error normal -> aquest sí que és un error real.
+      // TypeError: encuem la comanda localment i la reenviarem quan torni la
+      // connexió. Un error HTTP del servidor llança un Error normal -> error real.
       if (err instanceof TypeError) {
+        enqueue({ method: "POST", url: `${import.meta.env.VITE_API_URL}/orders`, body: payload });
         setSavedOrder({ ...payload, offline: true });
       } else {
         setSaveError("Error en guardar. Torna-ho a intentar.");

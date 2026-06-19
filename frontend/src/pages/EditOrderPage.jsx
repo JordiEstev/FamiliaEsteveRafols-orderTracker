@@ -5,6 +5,7 @@ import { Pencil, ArrowLeft } from "lucide-react";
 import { v4 as uuid } from "uuid";
 import FruitSelectorModal from "../components/FruitSelectorModal";
 import { PLACES, renderFruitLabel, renderFruitDetails } from "../utils/fruit";
+import { enqueue } from "../utils/offlineQueue";
 
 const FRUIT_EMOJI = {
   pressec_groc: "🍑", pressec_barrejat: "🍑", pressec_vermell: "🍑",
@@ -94,10 +95,10 @@ export default function EditOrderPage() {
       .then(data => { setSavedOrder(data); })
       .catch(err => {
         // Una fallada de xarxa (sense cobertura) fa que fetch rebutgi amb un
-        // TypeError; el service worker ja ha encuat el PUT (backgroundSync) i el
-        // reenviarà sol quan torni la connexió. Un error HTTP del servidor llança
-        // un Error normal -> aquest sí que és un error real.
+        // TypeError: encuem el PUT localment i el reenviarem quan torni la
+        // connexió. Un error HTTP del servidor llança un Error normal -> error real.
         if (err instanceof TypeError) {
+          enqueue({ method: "PUT", url: `${import.meta.env.VITE_API_URL}/orders/${id}`, body: payload });
           setSavedOrder({ ...payload, offline: true });
           return;
         }
