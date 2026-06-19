@@ -96,6 +96,13 @@ export default function AddOrderPage() {
         setSavedOrder(data);
       })
       .catch(err => {
+        // Sense cobertura el service worker encua el POST (backgroundSync) i el
+        // reenvia sol quan torni la connexió, però el fetch rebutja igualment.
+        // No és un error: mostrem una confirmació d'encuat en comptes del toast.
+        if (!navigator.onLine) {
+          setSavedOrder({ ...payload, offline: true });
+          return;
+        }
         console.error("Error saving order:", err);
         flashError("Hi ha hagut un error en guardar la comanda.");
       });
@@ -114,11 +121,18 @@ export default function AddOrderPage() {
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: "spring", stiffness: 280, damping: 18 }}
-              className="w-20 h-20 rounded-full bg-green-600 flex items-center justify-center shadow-xl shadow-green-950/60"
+              className={`w-20 h-20 rounded-full flex items-center justify-center shadow-xl ${savedOrder.offline ? "bg-amber-500 shadow-amber-950/60" : "bg-green-600 shadow-green-950/60"}`}
             >
-              <svg viewBox="0 0 24 24" fill="none" className="w-10 h-10" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
+              {savedOrder.offline ? (
+                <svg viewBox="0 0 24 24" fill="none" className="w-10 h-10" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="9" />
+                  <polyline points="12 7 12 12 15 14" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" className="w-10 h-10" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              )}
             </motion.div>
             <motion.div
               initial={{ opacity: 0, y: 8 }}
@@ -126,7 +140,14 @@ export default function AddOrderPage() {
               transition={{ delay: 0.15, duration: 0.2 }}
               className="text-center"
             >
-              <div className="text-2xl font-bold text-white">Comanda guardada</div>
+              <div className="text-2xl font-bold text-white">
+                {savedOrder.offline ? "Comanda encuada" : "Comanda guardada"}
+              </div>
+              {savedOrder.offline && (
+                <div className="text-sm text-amber-300/90 mt-1.5 max-w-xs mx-auto leading-snug">
+                  Sense cobertura. Es desarà automàticament quan tornis a tenir connexió.
+                </div>
+              )}
             </motion.div>
           </div>
 
@@ -194,13 +215,15 @@ export default function AddOrderPage() {
               Crear una altra
             </button>
             <div className="flex gap-2.5">
-              <button
-                onClick={() => navigate(`/edit/${savedOrder.id}`, { state: { returnPath } })}
-                className="flex-1 rounded-xl bg-stone-800 border border-stone-700 py-3 font-medium text-sm hover:bg-stone-700 transition-colors flex items-center justify-center gap-1.5"
-              >
-                <Pencil className="w-3.5 h-3.5 text-stone-400" />
-                Editar
-              </button>
+              {!savedOrder.offline && (
+                <button
+                  onClick={() => navigate(`/edit/${savedOrder.id}`, { state: { returnPath } })}
+                  className="flex-1 rounded-xl bg-stone-800 border border-stone-700 py-3 font-medium text-sm hover:bg-stone-700 transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <Pencil className="w-3.5 h-3.5 text-stone-400" />
+                  Editar
+                </button>
+              )}
               <button
                 onClick={() => navigate(returnPath)}
                 className="flex-1 rounded-xl bg-stone-800 border border-stone-700 py-3 font-medium text-sm hover:bg-stone-700 transition-colors flex items-center justify-center gap-1.5"

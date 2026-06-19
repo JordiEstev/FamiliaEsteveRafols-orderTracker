@@ -144,6 +144,13 @@ class OrderOut(BaseModel):
             data.__dict__["fruits"] = data.items
         return data
 
+    @field_validator('created_at', 'updated_at', mode='before')
+    @classmethod
+    def ensure_utc(cls, v):
+        if isinstance(v, datetime) and v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v
+
 # ---------- FastAPI ----------
 app = FastAPI()
 
