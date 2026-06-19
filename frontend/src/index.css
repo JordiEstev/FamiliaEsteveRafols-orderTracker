@@ -34,3 +34,12 @@ button:focus-visible {
   outline: 3px solid #f59e0b;
   outline-offset: 2px;
 }
+
+/* Amaga la barra de scroll (selector de data tipus roda) */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

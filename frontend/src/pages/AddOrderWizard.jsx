@@ -135,16 +135,17 @@ export default function AddOrderWizard() {
       setTimeout(() => otherDateRef.current?.showPicker?.(), 80);
       return;
     }
+    // La roda només fixa la data; s'avança amb el botó "Següent".
     setOrder(prev => ({ ...prev, date: value }));
-    advanceOrReturn(4);
   };
 
   const handleOtherDateChange = (e) => {
-    if (e.target.value) {
-      setOrder(prev => ({ ...prev, date: e.target.value }));
-      setShowOtherDate(false);
-      advanceOrReturn(4);
-    }
+    if (e.target.value) setOrder(prev => ({ ...prev, date: e.target.value }));
+  };
+
+  const handleDateNext = () => {
+    if (!order.date) return;
+    advanceOrReturn(4);
   };
 
   const removeFruit = (id) => setOrder(prev => ({ ...prev, fruits: prev.fruits.filter(f => f.id !== id) }));
@@ -442,6 +443,15 @@ export default function AddOrderWizard() {
                       </motion.div>
                     )}
                   </AnimatePresence>
+
+                  <button
+                    onClick={handleDateNext}
+                    disabled={!order.date}
+                    className="w-full mt-5 rounded-2xl py-4 font-semibold text-base flex items-center justify-center gap-2 active:scale-95 transition-all"
+                    style={{ backgroundColor: order.date ? "#F59E0B" : "#44403C", color: order.date ? "#1C1917" : "#78716C" }}
+                  >
+                    Següent <ChevronRight className="w-5 h-5" />
+                  </button>
                 </div>
               )}
 
