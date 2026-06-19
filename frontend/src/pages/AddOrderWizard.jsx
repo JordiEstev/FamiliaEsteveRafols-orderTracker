@@ -142,27 +142,36 @@ export default function AddOrderWizard() {
   const handleSubmit = async () => {
     setSaving(true);
     setSaveError("");
+    const payload = {
+      customer: order.customer.trim(),
+      date:     order.date,
+      place:    order.place,
+      notes:    order.notes,
+      fruits:   order.fruits.map(f => ({
+        fruit:  f.fruit,
+        size:   f.size   ?? null,
+        qty:    f.qty,
+        weight: f.weight ?? null,
+      })),
+    };
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/orders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customer: order.customer.trim(),
-          date:     order.date,
-          place:    order.place,
-          notes:    order.notes,
-          fruits:   order.fruits.map(f => ({
-            fruit:  f.fruit,
-            size:   f.size   ?? null,
-            qty:    f.qty,
-            weight: f.weight ?? null,
-          })),
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error();
       setSavedOrder(await res.json());
-    } catch {
-      setSaveError("Error en guardar. Torna-ho a intentar.");
+    } catch (err) {
+      // Una fallada de xarxa (sense cobertura) fa que fetch rebutgi amb un
+      // TypeError; el service worker ja ha encuat el POST (backgroundSync) i el
+      // reenviarà sol quan torni la connexió. Un error HTTP del servidor llança
+      // un Error normal -> aquest sí que és un error real.
+      if (err instanceof TypeError) {
+        setSavedOrder({ ...payload, offline: true });
+      } else {
+        setSaveError("Error en guardar. Torna-ho a intentar.");
+      }
     } finally {
       setSaving(false);
     }
@@ -180,14 +189,28 @@ export default function AddOrderWizard() {
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: "spring", stiffness: 280, damping: 18 }}
-              className="w-20 h-20 rounded-full bg-green-600 flex items-center justify-center shadow-xl shadow-green-950/60"
+              className={`w-20 h-20 rounded-full flex items-center justify-center shadow-xl ${savedOrder.offline ? "bg-amber-500 shadow-amber-950/60" : "bg-green-600 shadow-green-950/60"}`}
             >
-              <svg viewBox="0 0 24 24" fill="none" className="w-10 h-10" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
+              {savedOrder.offline ? (
+                <svg viewBox="0 0 24 24" fill="none" className="w-10 h-10" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="9" />
+                  <polyline points="12 7 12 12 15 14" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" className="w-10 h-10" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              )}
             </motion.div>
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-              <div className="text-2xl font-bold text-white">Comanda guardada</div>
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="text-center">
+              <div className="text-2xl font-bold text-white">
+                {savedOrder.offline ? "Comanda encuada" : "Comanda guardada"}
+              </div>
+              {savedOrder.offline && (
+                <div className="text-sm text-amber-300/90 mt-1.5 max-w-xs mx-auto leading-snug">
+                  Sense cobertura. Es desarà automàticament quan tornis a tenir connexió.
+                </div>
+              )}
             </motion.div>
           </div>
 
@@ -224,10 +247,12 @@ export default function AddOrderWizard() {
               <PlusIcon className="w-4 h-4" /> Crear una altra
             </button>
             <div className="flex gap-2.5">
-              <button onClick={() => navigate(`/edit/${savedOrder.id}`, { state: { returnPath } })}
-                className="flex-1 rounded-xl bg-stone-800 border border-stone-700 py-3 text-sm font-medium hover:bg-stone-700 transition-colors flex items-center justify-center gap-1.5">
-                <Pencil className="w-3.5 h-3.5 text-stone-400" /> Editar
-              </button>
+              {!savedOrder.offline && (
+                <button onClick={() => navigate(`/edit/${savedOrder.id}`, { state: { returnPath } })}
+                  className="flex-1 rounded-xl bg-stone-800 border border-stone-700 py-3 text-sm font-medium hover:bg-stone-700 transition-colors flex items-center justify-center gap-1.5">
+                  <Pencil className="w-3.5 h-3.5 text-stone-400" /> Editar
+                </button>
+              )}
               <button onClick={() => navigate(returnPath)}
                 className="flex-1 rounded-xl bg-stone-800 border border-stone-700 py-3 text-sm font-medium hover:bg-stone-700 transition-colors flex items-center justify-center gap-1.5">
                 <ArrowLeft className="w-3.5 h-3.5 text-stone-400" /> Tornar
