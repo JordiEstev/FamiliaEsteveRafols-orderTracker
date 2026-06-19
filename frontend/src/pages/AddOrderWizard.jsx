@@ -69,6 +69,9 @@ export default function AddOrderWizard() {
   });
   const [customerError, setCustomerError] = useState("");
   const [showOtherDate, setShowOtherDate] = useState(false);
+  // Quan s'edita un camp des del resum (pas 5), en confirmar tornem al resum
+  // en lloc de continuar el wizard pas a pas.
+  const [editFromSummary, setEditFromSummary] = useState(false);
   const [openFruitModal, setOpenFruitModal]   = useState(false);
   const [editingFruit, setEditingFruit]       = useState(null);
   const [savedOrder, setSavedOrder]           = useState(null);
@@ -84,7 +87,24 @@ export default function AddOrderWizard() {
     setShowOtherDate(false);
   };
 
-  const goBack = () => step === 1 ? navigate(-1) : goTo(step - 1, -1);
+  // Després de confirmar un pas: si estàvem editant des del resum, hi tornem;
+  // si no, avancem al pas indicat.
+  const advanceOrReturn = (fallbackStep) => {
+    if (editFromSummary) {
+      setEditFromSummary(false);
+      goTo(5, 1);
+    } else {
+      goTo(fallbackStep);
+    }
+  };
+
+  // Anar a editar un camp concret des del resum.
+  const editStep = (targetStep) => { setEditFromSummary(true); goTo(targetStep, -1); };
+
+  const goBack = () => {
+    setEditFromSummary(false);
+    return step === 1 ? navigate(-1) : goTo(step - 1, -1);
+  };
 
   // Autofocus customer input on step 1
   useEffect(() => {
@@ -96,12 +116,16 @@ export default function AddOrderWizard() {
   const handleCustomerNext = () => {
     if (order.customer.trim().length < 2) { setCustomerError("Mínim 2 caràcters"); return; }
     setCustomerError("");
-    goTo(2);
+    advanceOrReturn(2);
   };
 
   const handlePlaceSelect = (place) => {
-    setOrder(prev => ({ ...prev, place, date: "" }));
-    goTo(3);
+    const placeChanged = place !== order.place;
+    // La data depèn del lloc: si canvia, l'esborrem i obliguem a tornar-la a triar
+    // (encara que vinguem del resum) abans de tornar-hi.
+    setOrder(prev => ({ ...prev, place, date: placeChanged ? "" : prev.date }));
+    if (editFromSummary && placeChanged) { goTo(3); return; }
+    advanceOrReturn(3);
   };
 
   const handleDateOption = (value) => {
@@ -111,14 +135,14 @@ export default function AddOrderWizard() {
       return;
     }
     setOrder(prev => ({ ...prev, date: value }));
-    goTo(4);
+    advanceOrReturn(4);
   };
 
   const handleOtherDateChange = (e) => {
     if (e.target.value) {
       setOrder(prev => ({ ...prev, date: e.target.value }));
       setShowOtherDate(false);
-      goTo(4);
+      advanceOrReturn(4);
     }
   };
 
@@ -469,7 +493,7 @@ export default function AddOrderWizard() {
                   </button>
 
                   <button
-                    onClick={() => { if (order.fruits.length > 0) goTo(5); }}
+                    onClick={() => { if (order.fruits.length > 0) { setEditFromSummary(false); goTo(5); } }}
                     disabled={order.fruits.length === 0}
                     className="w-full rounded-2xl py-4 font-semibold text-stone-900 text-base flex items-center justify-center gap-2 active:scale-95 transition-all"
                     style={{ backgroundColor: order.fruits.length > 0 ? "#F59E0B" : "#44403C", color: order.fruits.length > 0 ? "#1C1917" : "#78716C" }}
@@ -490,7 +514,7 @@ export default function AddOrderWizard() {
                     {/* Client */}
                     <SummarySection
                       label="Client"
-                      onEdit={() => goTo(1, -1)}
+                      onEdit={() => editStep(1)}
                     >
                       <p className="text-base font-bold text-white mt-1">{order.customer}</p>
                     </SummarySection>
@@ -502,14 +526,14 @@ export default function AddOrderWizard() {
                           <p className="text-xs uppercase tracking-wide text-stone-500 font-medium">Lloc</p>
                           <p className="text-base font-bold text-white mt-1">{order.place}</p>
                         </div>
-                        <EditBtn onClick={() => goTo(2, -1)} />
+                        <EditBtn onClick={() => editStep(2)} />
                       </div>
                       <div className="flex items-start justify-between gap-3 p-4">
                         <div>
                           <p className="text-xs uppercase tracking-wide text-stone-500 font-medium">Data</p>
                           <p className="text-base font-bold text-white mt-1">{formatDisplayDate(order.date)}</p>
                         </div>
-                        <EditBtn onClick={() => goTo(3, -1)} />
+                        <EditBtn onClick={() => editStep(3)} />
                       </div>
                     </div>
 
@@ -519,7 +543,7 @@ export default function AddOrderWizard() {
                         <p className="text-xs uppercase tracking-wide text-stone-500 font-medium">
                           Fruita <span className="text-stone-600">({order.fruits.length})</span>
                         </p>
-                        <EditBtn onClick={() => goTo(4, -1)} />
+                        <EditBtn onClick={() => editStep(4)} />
                       </div>
                       {order.fruits.map((item, idx) => (
                         <div key={idx} className="flex items-center gap-3 px-4 py-3 border-b border-stone-700 last:border-b-0">
