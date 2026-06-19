@@ -253,7 +253,7 @@ function OrderListPage() {
       pickupTimerRef.current = null;
     }, 3000);
 
-    setPendingPickup({ id: order.id, orderId: order.id, customerName: order.customer, place: order.place, date: order.date, originalStatus: order.status });
+    setPendingPickup({ id: order.id, orderId: order.id, customerName: order.customer, place: order.place, date: order.date, fruits: order.fruits, originalStatus: order.status });
   };
 
   const handleUndoPickup = () => {
@@ -269,9 +269,19 @@ function OrderListPage() {
     clearTimeout(pickupTimerRef.current);
     pickupTimerRef.current = null;
     confirmPickupNow(pendingPickup.orderId);
-    const { customerName, place, date } = pendingPickup;
+    const { customerName, place, date, fruits } = pendingPickup;
     setPendingPickup(null);
-    navigate('/add', { state: { prefillCustomer: customerName, prefillPlace: place, prefillDate: date, returnPath: '/' } });
+    // Va directe al resum amb el mateix client, lloc i fruita, i la data + 1 setmana.
+    navigate('/add', {
+      state: {
+        prefillCustomer: customerName,
+        prefillPlace:    place,
+        prefillDate:     addDays(date, 7),
+        prefillFruits:   fruits || [],
+        prefillStep:     5,
+        returnPath:      '/',
+      },
+    });
   };
 
   // Repetir una comanda recollida: obre el wizard directament al resum (pas 5)
