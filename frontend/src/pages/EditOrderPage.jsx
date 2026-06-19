@@ -92,12 +92,12 @@ export default function EditOrderPage() {
     })
       .then(res => { if (!res.ok) throw new Error(); return res.json(); })
       .then(data => { setSavedOrder(data); })
-      .catch((err) => {
-        // Sense cobertura, Workbox encua el PUT (backgroundSync) i rejoint el fetch.
-        // Detectem "sense resposta HTTP" (TypeError) com a senyal que l'ha encuat,
-        // o comprovem navigator.onLine directament.
-        const isOfflineError = err instanceof TypeError || !navigator.onLine;
-        if (isOfflineError) {
+      .catch(err => {
+        // Una fallada de xarxa (sense cobertura) fa que fetch rebutgi amb un
+        // TypeError; el service worker ja ha encuat el PUT (backgroundSync) i el
+        // reenviarà sol quan torni la connexió. Un error HTTP del servidor llança
+        // un Error normal -> aquest sí que és un error real.
+        if (err instanceof TypeError) {
           setSavedOrder({ ...payload, offline: true });
           return;
         }
