@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Pencil, ArrowLeft } from "lucide-react";
 import { v4 as uuid } from "uuid";
 import FruitSelectorModal from "../components/FruitSelectorModal";
-import { PLACES, renderFruitLabel, renderFruitDetails } from "../utils/fruit";
+import DateScrollList from "../components/DateScrollList";
+import { PLACES, PLACE_WEEKDAYS, getScrollDates, renderFruitLabel, renderFruitDetails } from "../utils/fruit";
 import { enqueue } from "../utils/offlineQueue";
 
 const FRUIT_EMOJI = {
@@ -47,6 +48,8 @@ export default function EditOrderPage() {
   const [errorMessage, setErrorMessage]     = useState("");
   const [savedOrder, setSavedOrder]         = useState(null);
   const [saving, setSaving]                 = useState(false);
+  const [showOtherDate, setShowOtherDate]   = useState(false);
+  const otherDateRef = useRef(null);
 
   // Carrega la comanda. Si la llista ens l'ha passada per state, l'usem
   // directament i evitem el fetch (funciona sense cobertura, sense spinner).
@@ -60,6 +63,9 @@ export default function EditOrderPage() {
         status:   order.status || "pending",
       });
       setFruits(order.fruits.map(f => ({ ...f, id: f.id ?? uuid() })));
+      // Si la data desada no és cap de les opcions habituals del lloc (p. ex. una
+      // comanda antiga), obrim el camp d'"Altra data" perquè es vegi i es pugui editar.
+      setShowOtherDate(!!order.date && !getScrollDates(order.place).includes(order.date));
       setLoading(false);
     };
 
@@ -87,8 +93,39 @@ export default function EditOrderPage() {
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
+  // Una data és vàlida per a un lloc si cau en un dels seus dies de repartiment.
+  const isDateValidForPlace = (dateStr, place) => {
+    if (!dateStr || !place) return false;
+    const validDays = PLACE_WEEKDAYS[place] ?? [0, 1, 2, 3, 4, 5, 6];
+    return validDays.includes(new Date(dateStr + "T00:00:00").getDay());
+  };
+
+  const handlePlaceChange = (e) => {
+    const place = e.target.value;
+    // La data depèn del lloc: si la que hi ha ja no és vàlida, l'esborrem.
+    setForm(prev => ({ ...prev, place, date: isDateValidForPlace(prev.date, place) ? prev.date : "" }));
+    setShowOtherDate(false);
+  };
+
+  const handleDateSelect = (value) => {
+    if (value === "other") {
+      setShowOtherDate(true);
+      setTimeout(() => otherDateRef.current?.showPicker?.(), 80);
+      return;
+    }
+    setForm(prev => ({ ...prev, date: value }));
+    setShowOtherDate(false);
+  };
+
+  const handleOtherDateChange = (e) => {
+    if (e.target.value) setForm(prev => ({ ...prev, date: e.target.value }));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (form.customer.trim().length < 2) { setErrorMessage("El client ha de tenir mínim 2 caràcters."); return; }
+    if (!form.place) { setErrorMessage("Cal triar un lloc."); return; }
+    if (!form.date)  { setErrorMessage("Cal triar una data."); return; }
     if (!fruits.length) { setErrorMessage("Afegiu almenys una fruita."); return; }
     setSaving(true);
     setErrorMessage("");
@@ -262,27 +299,38 @@ export default function EditOrderPage() {
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs uppercase tracking-wide text-stone-400 font-medium">Data</label>
-          <input
-            type="date"
-            name="date"
-            value={form.date}
-            onChange={handleBasicChange}
-            className="w-full rounded-xl border border-stone-700 bg-stone-800 px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
-            required
-          />
-        </div>
-
-        <div className="space-y-1.5">
           <label className="text-xs uppercase tracking-wide text-stone-400 font-medium">Lloc</label>
           <select
             name="place"
             value={form.place}
-            onChange={handleBasicChange}
+            onChange={handlePlaceChange}
             className="w-full rounded-xl border border-stone-700 bg-stone-800 px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
           >
             {PLACES.map(p => <option key={p}>{p}</option>)}
           </select>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs uppercase tracking-wide text-stone-400 font-medium">Data</label>
+          {form.place ? (
+            <>
+              <DateScrollList place={form.place} selectedDate={form.date} onSelect={handleDateSelect} />
+              {showOtherDate && (
+                <input
+                  ref={otherDateRef}
+                  type="date"
+                  value={form.date || ""}
+                  onChange={handleOtherDateChange}
+                  className="w-full mt-2.5 rounded-xl border border-stone-700 bg-stone-800 px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
+                />
+              )}
+              {form.date && (
+                <p className="text-xs text-amber-400/90 font-medium pt-0.5">Triada: {formatDisplayDate(form.date)}</p>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-stone-500 italic py-1">Tria primer un lloc.</p>
+          )}
         </div>
 
         <div className="space-y-1.5">
