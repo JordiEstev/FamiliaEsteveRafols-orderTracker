@@ -4,14 +4,10 @@ import { motion } from "framer-motion";
 import { Pencil, ArrowLeft, ChevronDown } from "lucide-react";
 import { v4 as uuid } from "uuid";
 import FruitSelectorModal from "../components/FruitSelectorModal";
+import FruitIcon from "../components/FruitIcon";
 import DateScrollList from "../components/DateScrollList";
 import { PLACES, PLACE_WEEKDAYS, getScrollDates, renderFruitLabel, renderFruitDetails } from "../utils/fruit";
 import { enqueue } from "../utils/offlineQueue";
-
-const FRUIT_EMOJI = {
-  pressec_groc: "🍑", pressec_barrejat: "🍑", pressec_vermell: "🍑",
-  albercoc: "🟠", cirera: "🍒", melo: "🍈", sindria: "🍉",
-};
 
 const STATUS_OPTIONS = [
   { value: "pending",   label: "Pendent" },
@@ -231,7 +227,9 @@ export default function EditOrderPage() {
             </div>
             {savedOrder.fruits.map((item, idx) => (
               <div key={idx} className="flex items-center gap-3 px-5 py-3 border-b border-stone-800 last:border-b-0">
-                <span className="text-2xl w-8 text-center flex-shrink-0">{FRUIT_EMOJI[item.fruit] || "🍓"}</span>
+                <span className="w-8 flex-shrink-0 flex justify-center">
+                  <FruitIcon fruit={item.fruit} size={24} />
+                </span>
                 <span className="text-sm text-stone-200 font-medium">{renderFruitDetails(item)}</span>
               </div>
             ))}
@@ -423,9 +421,13 @@ export default function EditOrderPage() {
                 key={item.id || `${item.fruit}-${item.size}-${item.qty}`}
                 className="flex items-center gap-3 rounded-xl border border-stone-700 bg-stone-800 px-3 py-2.5 text-sm"
               >
-                <span className="text-xl w-7 text-center flex-shrink-0">{FRUIT_EMOJI[item.fruit] || "🍓"}</span>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-100">{renderFruitLabel(item)}</div>
+                  <div className="font-medium text-gray-100">
+                    <span className="flex items-center gap-2">
+                      <FruitIcon fruit={item.fruit} size={20} />
+                      {renderFruitLabel(item)}
+                    </span>
+                  </div>
                   <div className="text-stone-400 text-xs mt-0.5">{renderFruitDetails(item)}</div>
                 </div>
                 <button

@@ -3,11 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, X, ChevronLeft, ChevronRight, ChevronDown, ArrowUp, Package } from "lucide-react";
 import { renderFruitLabel, renderFruitDetails, PLACES, getPlacesForDate } from "../utils/fruit";
 import PickupToast from "../components/PickupToast";
-
-const FRUIT_EMOJI = {
-  pressec_groc: "🍑", pressec_barrejat: "🍑", pressec_vermell: "🍑",
-  albercoc: "🟠", cirera: "🍒", melo: "🍈", sindria: "🍉",
-};
+import FruitIcon from "../components/FruitIcon";
 
 const DIES = ["Diumenge","Dilluns","Dimarts","Dimecres","Dijous","Divendres","Dissabte"];
 
@@ -324,7 +320,7 @@ export default function PickingListPage() {
                   <div className="space-y-2.5">
                     {order.fruits.map((fruit, fi) => (
                       <div key={fi} className="flex items-start gap-2.5">
-                        <span className="text-lg flex-shrink-0 mt-0.5">{FRUIT_EMOJI[fruit.fruit] || "🍓"}</span>
+                        <FruitIcon fruit={fruit.fruit} size={20} className="flex-shrink-0 mt-0.5" />
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-semibold text-stone-800 leading-snug">{renderFruitLabel(fruit)}</div>
                           <div className="text-xs text-stone-500 mt-0.5">{renderFruitDetails(fruit)}</div>
@@ -465,7 +461,6 @@ function PendingSummaryList({ groups, orderSeen }) {
     <div className="space-y-4 pt-2">
       {orderSeen.map(fruitKey => {
         const items = groups[fruitKey];
-        const emoji = { pressec_groc: "🍑", pressec_barrejat: "🍑", pressec_vermell: "🍑", albercoc: "🟠", cirera: "🍒", melo: "🍈", sindria: "🍉" }[fruitKey] || "🍓";
 
         if (fruitKey.startsWith("pressec_")) {
           const variant = fruitKey.split("_")[1];
@@ -479,7 +474,7 @@ function PendingSummaryList({ groups, orderSeen }) {
           return (
             <div key={fruitKey} className="bg-orange-50 rounded-2xl p-4 border border-orange-100">
               <div className="flex items-center justify-between mb-2">
-                <span className="font-bold text-stone-900">{emoji} {label}</span>
+                <span className="font-bold text-stone-900 inline-flex items-center gap-1.5"><FruitIcon fruit={fruitKey} size={20} />{label}</span>
                 <span className="text-lg font-black text-amber-600">{total} <span className="text-xs font-semibold text-stone-500">{total === 1 ? "caixa" : "caixes"}</span></span>
               </div>
               <div className="space-y-1">
@@ -502,7 +497,7 @@ function PendingSummaryList({ groups, orderSeen }) {
           return (
             <div key={fruitKey} className="bg-yellow-50 rounded-2xl p-4 border border-yellow-100">
               <div className="flex items-center justify-between mb-2">
-                <span className="font-bold text-stone-900">{emoji} {label}</span>
+                <span className="font-bold text-stone-900 inline-flex items-center gap-1.5"><FruitIcon fruit={fruitKey} size={20} />{label}</span>
                 <span className="text-lg font-black text-yellow-600">{kg} <span className="text-xs font-semibold text-stone-500">kg</span></span>
               </div>
               <div className="space-y-1">
@@ -519,7 +514,7 @@ function PendingSummaryList({ groups, orderSeen }) {
           return (
             <div key={fruitKey} className="bg-green-50 rounded-2xl p-4 border border-green-100">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-stone-900">{emoji} {label}</span>
+                <span className="font-bold text-stone-900 inline-flex items-center gap-1.5"><FruitIcon fruit={fruitKey} size={20} />{label}</span>
                 <span className="text-lg font-black text-green-700">{total} <span className="text-xs font-semibold text-stone-500">{total === 1 ? "peça" : "peces"}</span></span>
               </div>
             </div>

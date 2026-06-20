@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { v4 as uuid } from "uuid";
+import FruitIcon from "./FruitIcon";
 
 const FRUIT_TYPES = [
-  { key: "pressec_groc",     label: "Pressec Groc",     emoji: "🍑", group: "pressec" },
-  { key: "pressec_barrejat", label: "Pressec Barrejat", emoji: "🍑", group: "pressec" },
-  { key: "pressec_vermell",  label: "Pressec Vermell",  emoji: "🍑", group: "pressec" },
-  { key: "albercoc",         label: "Albercoc",         emoji: "🟠" },
-  { key: "cirera",           label: "Cirera",           emoji: "🍒" },
-  { key: "melo",             label: "Meló",             emoji: "🍈" },
-  { key: "sindria",          label: "Síndria",          emoji: "🍉" },
+  { key: "pressec_groc",     label: "Pressec Groc",     group: "pressec" },
+  { key: "pressec_barrejat", label: "Pressec Barrejat", group: "pressec" },
+  { key: "pressec_vermell",  label: "Pressec Vermell",  group: "pressec" },
+  { key: "albercoc",         label: "Albercoc" },
+  { key: "cirera",           label: "Cirera" },
+  { key: "melo",             label: "Meló" },
+  { key: "sindria",          label: "Síndria" },
 ];
 
 const PEACH_SIZES = [15, 16, 18, 20, 22, 24, 26];
@@ -92,7 +93,7 @@ export default function FruitSelectorModal({ open, onClose, onAdd, editItem = nu
           <h3 className="text-base font-bold text-gray-100">
             {step === "grid" ? "Selecciona fruita" : (
               <span className="flex items-center gap-2">
-                <span>{selection?.emoji}</span>
+                {selection && <FruitIcon fruit={selection.key} size={22} />}
                 <span>{selection?.label}</span>
                 {isEditing && <span className="text-xs text-amber-400 font-normal ml-1">· Editant</span>}
               </span>
@@ -115,7 +116,7 @@ export default function FruitSelectorModal({ open, onClose, onAdd, editItem = nu
                 onClick={() => handleFruitClick(f)}
                 className="rounded-xl border border-stone-700 bg-stone-800 p-3 text-sm font-medium text-gray-100 hover:border-amber-500 hover:bg-stone-700 transition-all flex items-center gap-2"
               >
-                <span className="text-xl">{f.emoji}</span>
+                <FruitIcon fruit={f.key} size={28} />
                 <span className="text-left leading-tight">{f.label}</span>
               </button>
             ))}

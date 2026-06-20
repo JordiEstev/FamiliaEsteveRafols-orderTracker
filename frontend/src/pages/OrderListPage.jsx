@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx';
 import './OrderListPage.css';
 import { motion, AnimatePresence } from "framer-motion";
 import { renderFruitExportLine, PLACES, getPlacesForDate } from "../utils/fruit";
+import FruitIcon from "../components/FruitIcon";
 import { enqueue, queueCount } from "../utils/offlineQueue";
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -730,7 +731,10 @@ function OrderListPage() {
                       </div>
                       <div className="order-card-fruits space-y-0.5 mb-2">
                         {groupedFruits(order.fruits).map(({ key, text }) => (
-                          <div key={key} className="order-card-fruit-item text-sm text-stone-600 truncate">{text}</div>
+                          <div key={key} className="order-card-fruit-item text-sm text-stone-600 flex items-center gap-1.5">
+                            <FruitIcon fruit={key} size={20} />
+                            <span className="truncate">{text}</span>
+                          </div>
                         ))}
                       </div>
                       <div className="order-card-meta flex items-center gap-2 mb-3 flex-wrap">
@@ -813,7 +817,10 @@ function OrderListPage() {
                     </div>
                     <div className="order-card-fruits space-y-0.5">
                       {groupedFruits(order.fruits).map(({ key, text }) => (
-                        <div key={key} className="order-card-fruit-item text-sm text-stone-600">{text}</div>
+                        <div key={key} className="order-card-fruit-item text-sm text-stone-600 flex items-center gap-1.5">
+                          <FruitIcon fruit={key} size={20} />
+                          <span>{text}</span>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -883,7 +890,7 @@ function OrderListPage() {
                       <button onClick={() => toggleFruit(key)}
                         className="w-full flex items-center gap-3 px-4 py-4 text-left"
                         style={{ backgroundColor: st.bg }}>
-                        <span className="text-xl flex-shrink-0">🍑</span>
+                        <FruitIcon fruit={key} size={22} className="flex-shrink-0" />
                         <span className="flex-1 font-bold text-stone-900 capitalize">Pressec {variant}</span>
                         <span className="text-4xl font-black leading-none tabular-nums" style={{ color: st.numColor }}>{total}</span>
                         <span className="text-xs text-stone-500 w-9 text-left">{total === 1 ? "caixa" : "caixes"}</span>
@@ -926,7 +933,7 @@ function OrderListPage() {
                   return (
                     <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${st.border}` }}>
                       <button onClick={() => toggleFruit(key)} className="w-full flex items-center gap-3 px-4 py-4 text-left" style={{ backgroundColor: st.bg }}>
-                        <span className="text-xl flex-shrink-0">🟠</span>
+                        <FruitIcon fruit="albercoc" size={22} className="flex-shrink-0" />
                         <span className="flex-1 font-bold text-stone-900">Albercoc</span>
                         <span className="text-4xl font-black leading-none tabular-nums" style={{ color: st.numColor }}>{totalKg}</span>
                         <span className="text-xs text-stone-500 w-9 text-left">kg</span>
@@ -972,7 +979,7 @@ function OrderListPage() {
                   return (
                     <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${st.border}` }}>
                       <button onClick={() => toggleFruit(key)} className="w-full flex items-center gap-3 px-4 py-4 text-left" style={{ backgroundColor: st.bg }}>
-                        <span className="text-xl flex-shrink-0">🍒</span>
+                        <FruitIcon fruit="cirera" size={22} className="flex-shrink-0" />
                         <span className="flex-1 font-bold text-stone-900">Cirera</span>
                         <span className="text-4xl font-black leading-none tabular-nums" style={{ color: st.numColor }}>{totalKg}</span>
                         <span className="text-xs text-stone-500 w-9 text-left">kg</span>
@@ -1017,7 +1024,7 @@ function OrderListPage() {
                   return (
                     <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${st.border}` }}>
                       <button onClick={() => toggleFruit(key)} className="w-full flex items-center gap-3 px-4 py-4 text-left" style={{ backgroundColor: st.bg }}>
-                        <span className="text-xl flex-shrink-0">🍈</span>
+                        <FruitIcon fruit="melo" size={22} className="flex-shrink-0" />
                         <span className="flex-1 font-bold text-stone-900">Meló</span>
                         <span className="text-4xl font-black leading-none tabular-nums" style={{ color: st.numColor }}>{total}</span>
                         <span className="text-xs text-stone-500 w-9 text-left">{total === 1 ? "peça" : "peces"}</span>
@@ -1046,7 +1053,7 @@ function OrderListPage() {
                   return (
                     <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${st.border}` }}>
                       <button onClick={() => toggleFruit(key)} className="w-full flex items-center gap-3 px-4 py-4 text-left" style={{ backgroundColor: st.bg }}>
-                        <span className="text-xl flex-shrink-0">🍉</span>
+                        <FruitIcon fruit="sindria" size={22} className="flex-shrink-0" />
                         <span className="flex-1 font-bold text-stone-900">Síndria</span>
                         <span className="text-4xl font-black leading-none tabular-nums" style={{ color: st.numColor }}>{total}</span>
                         <span className="text-xs text-stone-500 w-9 text-left">{total === 1 ? "peça" : "peces"}</span>
@@ -1198,7 +1205,11 @@ function PrintSummary({ fruitSummary }) {
             const total = Object.values(sizes).reduce((a, list) => a + list.reduce((s, x) => s + x.qty, 0), 0);
             return (
               <tr key={variant}>
-                <td style={{ padding: "3px 8px 3px 0", fontWeight: 600 }}>🍑 Pressec {variant}</td>
+                <td style={{ padding: "3px 8px 3px 0", fontWeight: 600 }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <FruitIcon fruit={`pressec_${variant}`} size={16} /> Pressec {variant}
+                  </span>
+                </td>
                 <td style={{ padding: "3px 8px" }}>
                   {Object.entries(sizes).map(([size, list]) => {
                     const sub = list.reduce((a, x) => a + x.qty, 0);
@@ -1211,7 +1222,11 @@ function PrintSummary({ fruitSummary }) {
           })}
           {abKg > 0 && (
             <tr>
-              <td style={{ padding: "3px 8px 3px 0", fontWeight: 600 }}>🟠 Albercoc</td>
+              <td style={{ padding: "3px 8px 3px 0", fontWeight: 600 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                  <FruitIcon fruit="albercoc" size={16} /> Albercoc
+                </span>
+              </td>
               <td style={{ padding: "3px 8px" }}>
                 {ab1 > 0 && `${ab1} tarrines 1kg`}{ab1 > 0 && ab2 > 0 && " · "}{ab2 > 0 && `${ab2} caixes 2kg`}
               </td>
@@ -1220,7 +1235,11 @@ function PrintSummary({ fruitSummary }) {
           )}
           {ciKg > 0 && (
             <tr>
-              <td style={{ padding: "3px 8px 3px 0", fontWeight: 600 }}>🍒 Cirera</td>
+              <td style={{ padding: "3px 8px 3px 0", fontWeight: 600 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                  <FruitIcon fruit="cirera" size={16} /> Cirera
+                </span>
+              </td>
               <td style={{ padding: "3px 8px" }}>
                 {ci1 > 0 && `${ci1} tarrines 1kg`}{ci1 > 0 && ci2 > 0 && " · "}{ci2 > 0 && `${ci2} caixes 2kg`}
               </td>
@@ -1229,14 +1248,22 @@ function PrintSummary({ fruitSummary }) {
           )}
           {meloTotal > 0 && (
             <tr>
-              <td style={{ padding: "3px 8px 3px 0", fontWeight: 600 }}>🍈 Meló</td>
+              <td style={{ padding: "3px 8px 3px 0", fontWeight: 600 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                  <FruitIcon fruit="melo" size={16} /> Meló
+                </span>
+              </td>
               <td style={{ padding: "3px 8px" }}></td>
               <td style={{ padding: "3px 0", fontWeight: 700, textAlign: "right" }}>{meloTotal} peces</td>
             </tr>
           )}
           {sindriaTotal > 0 && (
             <tr>
-              <td style={{ padding: "3px 8px 3px 0", fontWeight: 600 }}>🍉 Síndria</td>
+              <td style={{ padding: "3px 8px 3px 0", fontWeight: 600 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                  <FruitIcon fruit="sindria" size={16} /> Síndria
+                </span>
+              </td>
               <td style={{ padding: "3px 8px" }}></td>
               <td style={{ padding: "3px 0", fontWeight: 700, textAlign: "right" }}>{sindriaTotal} peces</td>
             </tr>

@@ -4,16 +4,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { v4 as uuid } from "uuid";
 import { ArrowLeft, ChevronRight, Pencil, Plus as PlusIcon, Check } from "lucide-react";
 import FruitSelectorModal from "../components/FruitSelectorModal";
+import FruitIcon from "../components/FruitIcon";
 import DateScrollList from "../components/DateScrollList";
 import { PLACES, renderFruitLabel, renderFruitDetails } from "../utils/fruit";
 import { enqueue } from "../utils/offlineQueue";
-
-// ── Constants ────────────────────────────────────────────────────────────────
-
-const FRUIT_EMOJI = {
-  pressec_groc: "🍑", pressec_barrejat: "🍑", pressec_vermell: "🍑",
-  albercoc: "🟠", cirera: "🍒", melo: "🍈", sindria: "🍉",
-};
 
 const STEP_LABELS = ["Client", "Lloc", "Data", "Fruita", "Resum"];
 const TOTAL_STEPS = 5;
@@ -254,7 +248,9 @@ export default function AddOrderWizard() {
             </div>
             {savedOrder.fruits.map((item, idx) => (
               <div key={idx} className="flex items-center gap-3 px-5 py-3 border-b border-stone-800 last:border-b-0">
-                <span className="text-2xl w-8 text-center flex-shrink-0">{FRUIT_EMOJI[item.fruit] || "🍓"}</span>
+                <span className="w-8 flex-shrink-0 flex justify-center">
+                  <FruitIcon fruit={item.fruit} size={24} />
+                </span>
                 <span className="text-sm text-stone-200 font-medium">{renderFruitDetails(item)}</span>
               </div>
             ))}
@@ -478,7 +474,9 @@ export default function AddOrderWizard() {
                       {order.fruits.map(item => (
                         <li key={item.id}
                           className="flex items-center gap-3 rounded-2xl border border-stone-700 bg-stone-800/80 px-4 py-3.5">
-                          <span className="text-2xl w-8 text-center flex-shrink-0">{FRUIT_EMOJI[item.fruit] || "🍓"}</span>
+                          <span className="w-8 flex-shrink-0 flex justify-center">
+                            <FruitIcon fruit={item.fruit} size={24} />
+                          </span>
                           <div className="flex-1 min-w-0">
                             <div className="font-semibold text-sm text-gray-100">{renderFruitLabel(item)}</div>
                             <div className="text-xs text-stone-400 mt-0.5">{renderFruitDetails(item)}</div>
@@ -563,7 +561,9 @@ export default function AddOrderWizard() {
                       </div>
                       {order.fruits.map((item, idx) => (
                         <div key={idx} className="flex items-center gap-3 px-4 py-3 border-b border-stone-700 last:border-b-0">
-                          <span className="text-xl w-7 text-center flex-shrink-0">{FRUIT_EMOJI[item.fruit] || "🍓"}</span>
+                          <span className="w-7 flex-shrink-0 flex justify-center">
+                            <FruitIcon fruit={item.fruit} size={22} />
+                          </span>
                           <div className="min-w-0">
                             <span className="text-sm font-semibold text-stone-100">{renderFruitLabel(item)}</span>
                             <span className="text-xs text-stone-400 ml-2">{renderFruitDetails(item)}</span>

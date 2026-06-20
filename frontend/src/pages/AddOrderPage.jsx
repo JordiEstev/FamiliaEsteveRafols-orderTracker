@@ -1,15 +1,11 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import FruitSelectorModal from "../components/FruitSelectorModal";
+import FruitIcon from "../components/FruitIcon";
 import { motion } from "framer-motion";
 import { Pencil, ArrowLeft, Plus as PlusIcon } from "lucide-react";
 
 import { FRUIT_TYPES, PEACH_SIZES, renderFruitLabel, renderFruitDetails } from "../utils/fruit";
-
-const FRUIT_EMOJI = {
-  pressec_groc: "🍑", pressec_barrejat: "🍑", pressec_vermell: "🍑",
-  albercoc: "🟠", cirera: "🍒", melo: "🍈", sindria: "🍉",
-};
 
 function formatDate(dateStr) {
   if (!dateStr) return "";
@@ -176,8 +172,8 @@ export default function AddOrderPage() {
                   key={idx}
                   className="flex items-center gap-3 px-5 py-3 border-b border-stone-800 last:border-b-0"
                 >
-                  <span className="text-2xl leading-none w-8 text-center flex-shrink-0">
-                    {FRUIT_EMOJI[item.fruit] || "🍓"}
+                  <span className="w-8 flex-shrink-0 flex justify-center">
+                    <FruitIcon fruit={item.fruit} size={24} />
                   </span>
                   <span className="text-sm text-stone-200 font-medium">
                     {renderFruitDetails(item)}
@@ -347,7 +343,10 @@ export default function AddOrderPage() {
                 >
                   <div className="pr-2">
                     <div className="font-medium text-gray-100">
-                      {renderFruitLabel(item)}
+                      <span className="flex items-center gap-2">
+                        <FruitIcon fruit={item.fruit} size={20} />
+                        {renderFruitLabel(item)}
+                      </span>
                     </div>
                     <div className="text-stone-400 text-xs mt-0.5">
                       {renderFruitDetails(item)}
