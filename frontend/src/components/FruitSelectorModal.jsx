@@ -16,7 +16,12 @@ const PEACH_SIZES = [15, 16, 18, 20, 22, 24, 26];
 
 function initFormFromItem(item) {
   if (!item) return {};
-  if (item.fruit?.startsWith("pressec")) return { size: item.size ?? 15, qty: item.qty ?? 1 };
+  if (item.fruit?.startsWith("pressec")) {
+    const qty = item.qty ?? 1;
+    const wholeQty = Math.floor(qty);
+    const hasHalf = qty % 1 !== 0;
+    return { size: item.size ?? 15, qty: wholeQty, halfBox: hasHalf };
+  }
   if (["albercoc", "cirera"].includes(item.fruit)) return { weight: item.weight ?? 1, qty: item.qty ?? 1 };
   return { qty: item.qty ?? 1, weight: item.weight ?? "" };
 }
@@ -47,7 +52,7 @@ export default function FruitSelectorModal({ open, onClose, onAdd, editItem = nu
   const handleFruitClick = (f) => {
     setSelection(f);
     if (f.group === "pressec") {
-      setForm({ size: 15, qty: 1 });
+      setForm({ size: 15, qty: 1, halfBox: false });
     } else if (["albercoc", "cirera"].includes(f.key)) {
       setForm({ weight: 1, qty: 1 });
     } else {
@@ -68,7 +73,9 @@ export default function FruitSelectorModal({ open, onClose, onAdd, editItem = nu
     if (!selection) return;
     let item;
     if (selection.group === "pressec") {
-      item = { id: uuid(), fruit: selection.key, size: Number(form.size), qty: Number(form.qty), weight: null };
+      const baseQty = Number(form.qty);
+      const finalQty = form.halfBox ? baseQty + 0.5 : baseQty;
+      item = { id: uuid(), fruit: selection.key, size: Number(form.size), qty: finalQty, weight: null };
     } else if (["albercoc", "cirera"].includes(selection.key)) {
       item = { id: uuid(), fruit: selection.key, qty: Number(form.qty), weight: Number(form.weight) };
     } else {
@@ -148,7 +155,21 @@ export default function FruitSelectorModal({ open, onClose, onAdd, editItem = nu
                     ))}
                   </div>
                 </div>
-                <QtyStepper qty={form.qty} setQty={setQty} label="Caixes" />
+                <div className="space-y-2">
+                  <QtyStepper qty={form.qty} setQty={setQty} label="Caixes" />
+                  <div className="flex items-center gap-2 px-3 py-2">
+                    <input
+                      type="checkbox"
+                      id="halfbox-toggle"
+                      checked={form.halfBox || false}
+                      onChange={(e) => setForm(prev => ({ ...prev, halfBox: e.target.checked }))}
+                      className="w-4 h-4 rounded cursor-pointer accent-amber-400"
+                    />
+                    <label htmlFor="halfbox-toggle" className="text-xs font-medium text-stone-300 cursor-pointer flex-1">
+                      + Mitja caixa
+                    </label>
+                  </div>
+                </div>
               </>
             )}
 

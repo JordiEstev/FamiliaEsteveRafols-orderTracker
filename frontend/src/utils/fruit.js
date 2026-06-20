@@ -31,8 +31,9 @@ export function renderFruitLabel(item) {
 
 export function renderFruitDetails(item) {
   if (item.fruit.startsWith("pressec_")) {
+    const qtyStr = item.qty % 1 === 0 ? item.qty : item.qty.toFixed(1);
     const label = item.qty === 1 ? "caixa" : "caixes";
-    return `${item.qty} ${label} · calibre ${item.size}`;
+    return `${qtyStr} ${label} · calibre ${item.size}`;
   }
   if (item.fruit === "albercoc" || item.fruit === "cirera") {
     const containerSingular = item.weight === 1 ? "Tarrina" : "Caixa";
@@ -101,8 +102,9 @@ export function getWeekdayForPlace(place) {
 export function renderFruitExportLine(item) {
   if (item.fruit.startsWith("pressec_")) {
     const type = item.fruit.split("_")[1];
+    const qtyStr = item.qty % 1 === 0 ? item.qty : item.qty.toFixed(1);
     const label = item.qty > 1 ? "caixes" : "caixa";
-    return `Pressec ${type} · ${item.qty} ${label} · calibre ${item.size}`;
+    return `Pressec ${type} · ${qtyStr} ${label} · calibre ${item.size}`;
   }
   if (item.fruit === "albercoc" || item.fruit === "cirera") {
     const singular = item.weight === 1 ? "Tarrina" : "Caixa";
