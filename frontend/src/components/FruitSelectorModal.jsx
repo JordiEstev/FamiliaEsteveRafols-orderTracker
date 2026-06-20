@@ -66,8 +66,10 @@ export default function FruitSelectorModal({ open, onClose, onAdd, editItem = nu
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const setQty = (v) =>
-    setForm(prev => ({ ...prev, qty: Math.max(1, Number(v) || 1) }));
+  const setQty = (v) => {
+    const numVal = Number(v) || 0.5;
+    setForm(prev => ({ ...prev, qty: Math.max(0.5, numVal) }));
+  };
 
   const handleSave = () => {
     if (!selection) return;
@@ -155,19 +157,48 @@ export default function FruitSelectorModal({ open, onClose, onAdd, editItem = nu
                     ))}
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <QtyStepper qty={form.qty} setQty={setQty} label="Caixes" />
-                  <div className="flex items-center gap-2 px-3 py-2">
-                    <input
-                      type="checkbox"
-                      id="halfbox-toggle"
-                      checked={form.halfBox || false}
-                      onChange={(e) => setForm(prev => ({ ...prev, halfBox: e.target.checked }))}
-                      className="w-4 h-4 rounded cursor-pointer accent-amber-400"
-                    />
-                    <label htmlFor="halfbox-toggle" className="text-xs font-medium text-stone-300 cursor-pointer flex-1">
-                      + Mitja caixa
-                    </label>
+                <div>
+                  <label className="block text-xs text-stone-400 uppercase tracking-wide font-medium mb-2">Caixes</label>
+                  <div className="flex items-stretch gap-2 overflow-hidden">
+                    <div className="flex-1 flex items-stretch overflow-hidden rounded-xl border border-stone-600">
+                      <button
+                        type="button"
+                        onClick={() => setQty(Math.max(0.5, form.qty - 1))}
+                        className="bg-stone-800 px-4 text-xl text-stone-200 hover:bg-stone-700 transition-colors font-light"
+                      >
+                        &minus;
+                      </button>
+                      <input
+                        type="number"
+                        min={0.5}
+                        step={0.5}
+                        value={form.qty}
+                        onChange={(e) => setQty(Number(e.target.value) || 0.5)}
+                        className="w-full bg-stone-900 text-center text-gray-100 text-sm font-semibold focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setQty(form.qty + 1)}
+                        className="bg-stone-800 px-4 text-xl text-stone-200 hover:bg-stone-700 transition-colors font-light"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setForm(prev => ({ ...prev, halfBox: !prev.halfBox }))}
+                      className="px-4 py-2.5 rounded-xl border-2 font-semibold text-sm transition-all flex items-center justify-center"
+                      style={form.halfBox || false
+                        ? { backgroundColor: "#F59E0B", borderColor: "#F59E0B", color: "#1C1917" }
+                        : { backgroundColor: "#292524", borderColor: "#44403C", color: "#D6D3D1" }
+                      }
+                      title="Afegir mitja caixa"
+                    >
+                      + 1/2
+                    </button>
+                  </div>
+                  <div className="mt-2 text-center text-xs text-stone-400">
+                    Total: <span className="font-semibold text-stone-200">{(form.qty + (form.halfBox ? 0.5 : 0)).toFixed(1)}</span> caixes
                   </div>
                 </div>
               </>
