@@ -48,6 +48,34 @@ export function renderFruitDetails(item) {
   return `${item.qty}`;
 }
 
+// Compact labels for the print-friendly packing list (the icon already
+// conveys which fruit it is, so the text can be very short).
+const FRUIT_TAGS = {
+  pressec_groc:     "PG",
+  pressec_vermell:  "PV",
+  pressec_barrejat: "PB",
+  albercoc:         "Alb",
+  cirera:           "Cir",
+  melo:             "Meló",
+  sindria:          "Síndria",
+};
+
+export function renderFruitCompact(item) {
+  const tag = FRUIT_TAGS[item.fruit] || item.fruit;
+
+  if (item.fruit.startsWith("pressec_")) {
+    return `${tag}: ${item.qty} c (${item.size})`;
+  }
+  if (item.fruit === "albercoc" || item.fruit === "cirera") {
+    const unit = item.weight === 1 ? "t" : "c";
+    return `${tag}: ${item.qty} ${unit} (${item.weight}kg)`;
+  }
+  if (item.fruit === "melo" || item.fruit === "sindria") {
+    return `${tag}: ${item.qty}${item.weight ? ` (${item.weight}kg)` : ""}`;
+  }
+  return `${tag}: ${item.qty}`;
+}
+
 // Place → valid weekdays (0=Sun … 6=Sat)
 export const PLACE_WEEKDAYS = {
   "Sant Pau":   [0, 6],

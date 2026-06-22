@@ -8,7 +8,7 @@ import PickupToast from "../components/PickupToast";
 import * as XLSX from 'xlsx';
 import './OrderListPage.css';
 import { motion, AnimatePresence } from "framer-motion";
-import { renderFruitExportLine, PLACES, getPlacesForDate } from "../utils/fruit";
+import { renderFruitExportLine, renderFruitCompact, PLACES, getPlacesForDate } from "../utils/fruit";
 import FruitIcon from "../components/FruitIcon";
 import { enqueue, queueCount } from "../utils/offlineQueue";
 
@@ -815,11 +815,11 @@ function OrderListPage() {
                       <span className="order-card-check" />
                       <span className="order-card-customer font-bold text-stone-900 text-base leading-tight">{order.customer}</span>
                     </div>
-                    <div className="order-card-fruits space-y-0.5">
-                      {groupedFruits(order.fruits).map(({ key, text }) => (
-                        <div key={key} className="order-card-fruit-item text-sm text-stone-600 flex items-center gap-1.5">
-                          <FruitIcon fruit={key} size={20} />
-                          <span>{text}</span>
+                    <div className="order-card-fruits flex flex-col gap-1">
+                      {order.fruits.map((item, fi) => (
+                        <div key={fi} className="order-card-fruit-item text-sm text-stone-600 flex items-center gap-2">
+                          <FruitIcon fruit={item.fruit} size={20} />
+                          <span>{renderFruitCompact(item)}</span>
                         </div>
                       ))}
                     </div>

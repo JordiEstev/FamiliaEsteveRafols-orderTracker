@@ -106,27 +106,23 @@
     line-height: 1.35 !important;
   }
 
-  /* Fruits — fill remaining width, items inline */
+  /* Fruits — fill remaining width, one fruit per row */
   .order-card-fruits {
     flex: 1 !important;
     display: flex !important;
-    flex-wrap: wrap !important;
-    align-items: baseline !important;
-    gap: 0 !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 2px !important;
     margin-bottom: 0 !important;
   }
 
   .order-card-fruit-item {
     font-size: 0.75rem !important;
     color: #111 !important;
-    display: inline !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
     white-space: nowrap;
-  }
-
-  /* Separate multiple fruits with a middot */
-  .order-card-fruit-item + .order-card-fruit-item::before {
-    content: " · ";
-    color: #888;
   }
 
   /* Hide these on print */
