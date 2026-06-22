@@ -60,20 +60,30 @@ const FRUIT_TAGS = {
   sindria:          "Síndria",
 };
 
-export function renderFruitCompact(item) {
-  const tag = FRUIT_TAGS[item.fruit] || item.fruit;
-
+// Just the quantity/calibre part, without the fruit tag.
+function fruitCompactDetail(item) {
   if (item.fruit.startsWith("pressec_")) {
-    return `${tag}: ${item.qty} c (${item.size})`;
+    return `${item.qty} c (${item.size})`;
   }
   if (item.fruit === "albercoc" || item.fruit === "cirera") {
     const unit = item.weight === 1 ? "t" : "c";
-    return `${tag}: ${item.qty} ${unit} (${item.weight}kg)`;
+    return `${item.qty} ${unit} (${item.weight}kg)`;
   }
   if (item.fruit === "melo" || item.fruit === "sindria") {
-    return `${tag}: ${item.qty}${item.weight ? ` (${item.weight}kg)` : ""}`;
+    return `${item.qty}${item.weight ? ` (${item.weight}kg)` : ""}`;
   }
-  return `${tag}: ${item.qty}`;
+  return `${item.qty}`;
+}
+
+export function renderFruitCompact(item) {
+  const tag = FRUIT_TAGS[item.fruit] || item.fruit;
+  return `${tag}: ${fruitCompactDetail(item)}`;
+}
+
+// Same fruit, several entries → one tag, details joined: "PG: 1 c (18) · 1 c (20)"
+export function renderFruitCompactGroup(items) {
+  const tag = FRUIT_TAGS[items[0].fruit] || items[0].fruit;
+  return `${tag}: ${items.map(fruitCompactDetail).join(" · ")}`;
 }
 
 // Place → valid weekdays (0=Sun … 6=Sat)

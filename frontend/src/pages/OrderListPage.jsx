@@ -8,7 +8,7 @@ import PickupToast from "../components/PickupToast";
 import * as XLSX from 'xlsx';
 import './OrderListPage.css';
 import { motion, AnimatePresence } from "framer-motion";
-import { renderFruitExportLine, renderFruitCompact, PLACES, getPlacesForDate } from "../utils/fruit";
+import { renderFruitExportLine, renderFruitCompactGroup, PLACES, getPlacesForDate } from "../utils/fruit";
 import FruitIcon from "../components/FruitIcon";
 import { enqueue, queueCount } from "../utils/offlineQueue";
 
@@ -816,10 +816,10 @@ function OrderListPage() {
                       <span className="order-card-customer font-bold text-stone-900 text-base leading-tight">{order.customer}</span>
                     </div>
                     <div className="order-card-fruits flex flex-col gap-1">
-                      {order.fruits.map((item, fi) => (
-                        <div key={fi} className="order-card-fruit-item text-sm text-stone-600 flex items-center gap-2">
-                          <FruitIcon fruit={item.fruit} size={20} />
-                          <span>{renderFruitCompact(item)}</span>
+                      {groupFruitsByType(order.fruits).map(({ key, items }) => (
+                        <div key={key} className="order-card-fruit-item text-sm text-stone-600 flex items-center gap-2">
+                          <FruitIcon fruit={key} size={20} />
+                          <span>{renderFruitCompactGroup(items)}</span>
                         </div>
                       ))}
                     </div>
@@ -1168,16 +1168,20 @@ function fruitItemDetail(item) {
   return `${item.qty}`;
 }
 
-function groupedFruits(fruits) {
+function groupFruitsByType(fruits) {
   const order = [];
   const groups = {};
   for (const f of fruits) {
     if (!groups[f.fruit]) { groups[f.fruit] = []; order.push(f.fruit); }
     groups[f.fruit].push(f);
   }
-  return order.map(key => ({
+  return order.map(key => ({ key, items: groups[key] }));
+}
+
+function groupedFruits(fruits) {
+  return groupFruitsByType(fruits).map(({ key, items }) => ({
     key,
-    text: `${fruitTypeLabel(key)}: ${groups[key].map(fruitItemDetail).join(', ')}`,
+    text: `${fruitTypeLabel(key)}: ${items.map(fruitItemDetail).join(', ')}`,
   }));
 }
 
