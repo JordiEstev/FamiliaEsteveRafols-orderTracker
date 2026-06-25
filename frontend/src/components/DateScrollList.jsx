@@ -1,25 +1,62 @@
 import { useRef, useEffect, useState } from "react";
 import { Calendar } from "lucide-react";
 import { getScrollDates } from "../utils/fruit";
+import { MESOS_CA, DIES_CA, capFirst, diaDiff } from "../utils/dates";
 
 // Selector de data tipus roda d'iPhone: l'element centrat és el seleccionat.
 // Filtra les dates pels dies vàlids de cada lloc. Compartit entre crear i editar.
 // onSelect rep una data "YYYY-MM-DD" (quan la roda s'atura al centre o es toca
 // una fila) o el literal "other" (botó "Altra data").
 
-const DIES_SCROLL = ["Diumenge", "Dilluns", "Dimarts", "Dimecres", "Dijous", "Divendres", "Dissabte"];
-
-const ITEM_H = 36;   // alçada de cada fila (px)
+const ITEM_H = 56;   // alçada de cada fila (px) — encabeix títol + subtítol + separador
 const VISIBLE = 5;   // files visibles (senar perquè n'hi hagi una al centre)
 const PAD = ((VISIBLE - 1) / 2) * ITEM_H;
+const DIV_H = 15;    // alçada de la franja del separador de mes (a la vora superior)
 
 export default function DateScrollList({ place, selectedDate, onSelect }) {
   const dates = getScrollDates(place);
 
   const today = new Date().toLocaleDateString('sv', { timeZone: 'Europe/Madrid' });
-  const [ty, tm, td] = today.split('-').map(Number);
-  const tomorrowDt = new Date(Date.UTC(ty, tm - 1, td + 1));
-  const tomorrow = `${tomorrowDt.getUTCFullYear()}-${String(tomorrowDt.getUTCMonth() + 1).padStart(2, '0')}-${String(tomorrowDt.getUTCDate()).padStart(2, '0')}`;
+
+  // Precalcula la presentació de cada fila (un sol recorregut sobre la llista):
+  // - subtítol relatiu respecte avui (Avui / Demà / "Aquest {dia}" la primera
+  //   ocurrència propera de cada dia de la setmana, només si és a ≤ 14 dies);
+  // - separador de mes la primera fila de cada mes nou (amb l'any si també canvia).
+  const seenDow = new Set();   // dies de la setmana ja etiquetats com a "Aquest …"
+  let prevMonth = null;
+  let prevYear  = null;
+  const rows = dates.map((dateStr) => {
+    const d = new Date(dateStr + "T00:00:00");
+    const dow = d.getDay();
+    const month = d.getMonth();
+    const year = d.getFullYear();
+    const diff = diaDiff(today, dateStr);
+
+    let subtitle = null;
+    if (diff === 0) { subtitle = "Avui"; seenDow.add(dow); }
+    else if (diff === 1) { subtitle = "Demà"; seenDow.add(dow); }
+    else if (diff >= 2 && diff <= 14 && !seenDow.has(dow)) {
+      subtitle = `Aquest ${DIES_CA[dow]}`;
+      seenDow.add(dow);
+    }
+
+    const monthChanged = month !== prevMonth || year !== prevYear;
+    const yearChanged  = year !== prevYear;
+    const showDivider  = prevMonth !== null && monthChanged;
+    const dividerLabel = showDivider
+      ? (yearChanged ? `${MESOS_CA[month]} ${year}` : MESOS_CA[month])
+      : null;
+    prevMonth = month;
+    prevYear = year;
+
+    return {
+      dateStr,
+      title: `${capFirst(DIES_CA[dow])} ${d.getDate()}`,
+      monthName: MESOS_CA[month],
+      subtitle,
+      dividerLabel,
+    };
+  });
 
   const scrollRef   = useRef(null);
   const interacted  = useRef(false);   // distingeix scroll de l'usuari vs programàtic
@@ -102,45 +139,72 @@ export default function DateScrollList({ place, selectedDate, onSelect }) {
           }}
         >
           <div style={{ height: PAD }} />
-          {dates.map((dateStr, idx) => {
+          {rows.map((row, idx) => {
             const isCenter = idx === centerIdx;
-            const dow = new Date(dateStr + "T00:00:00").getDay();
-            const dowName = DIES_SCROLL[dow];
-            const [, mm, dd] = dateStr.split('-');
-            const datePart = `${parseInt(dd)}/${parseInt(mm)}`;
-
-            let mainLabel;
-            if (dateStr === today)        mainLabel = `Aquest ${dowName.toLowerCase()} (Avui)`;
-            else if (dateStr === tomorrow) mainLabel = `Aquest ${dowName.toLowerCase()} (Demà)`;
-            else                           mainLabel = dowName;
-
             return (
               <button
-                key={dateStr}
+                key={row.dateStr}
                 type="button"
                 onClick={() => handleRowClick(idx)}
-                className="w-full flex items-center justify-between px-5 transition-all"
+                className="relative w-full transition-all"
                 style={{ height: ITEM_H, scrollSnapAlign: "center" }}
               >
-                <span
-                  className="font-semibold truncate transition-all"
-                  style={{
-                    fontSize: isCenter ? "0.95rem" : "0.85rem",
-                    color: isCenter ? "#F8FAFC" : "#78716C",
-                    opacity: isCenter ? 1 : 0.7,
-                  }}
-                >
-                  {mainLabel}
-                </span>
-                <span
-                  className="font-medium transition-all"
-                  style={{
-                    fontSize: isCenter ? "0.9rem" : "0.8rem",
-                    color: isCenter ? "#FBBF24" : "#57534E",
-                  }}
-                >
-                  {datePart}
-                </span>
+                {/* Separador de mes: línia a la vora superior de la fila (el límit
+                    entre mesos), només quan el mes canvia respecte l'anterior. */}
+                {row.dividerLabel && (
+                  <div
+                    className="absolute inset-x-0 top-0 flex items-center px-5 pointer-events-none"
+                    style={{ height: DIV_H }}
+                  >
+                    <span
+                      className="font-semibold uppercase whitespace-nowrap"
+                      style={{ fontSize: "0.6rem", color: "#78716C", letterSpacing: "0.08em" }}
+                    >
+                      {row.dividerLabel}
+                    </span>
+                    <span className="flex-1 ml-2" style={{ height: 1, backgroundColor: "#44403C" }} />
+                  </div>
+                )}
+
+                {/* Contingut: títol (dia + número) amb subtítol relatiu opcional,
+                    i el mes en lletra a la dreta. Centrat dins la fila sencera. */}
+                <div className="absolute inset-0 flex items-center justify-between px-5">
+                  <div className="flex flex-col items-start min-w-0">
+                    <span
+                      className="font-semibold truncate transition-all"
+                      style={{
+                        fontSize: isCenter ? "1.05rem" : "0.9rem",
+                        color: isCenter ? "#F8FAFC" : "#78716C",
+                        opacity: isCenter ? 1 : 0.7,
+                        lineHeight: 1.15,
+                      }}
+                    >
+                      {row.title}
+                    </span>
+                    {row.subtitle && (
+                      <span
+                        className="font-medium truncate transition-all"
+                        style={{
+                          fontSize: isCenter ? "0.72rem" : "0.66rem",
+                          color: isCenter ? "#FBBF24" : "#57534E",
+                          opacity: isCenter ? 0.9 : 0.7,
+                          lineHeight: 1.1,
+                        }}
+                      >
+                        {row.subtitle}
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    className="font-medium transition-all whitespace-nowrap"
+                    style={{
+                      fontSize: isCenter ? "0.85rem" : "0.78rem",
+                      color: isCenter ? "#FBBF24" : "#57534E",
+                    }}
+                  >
+                    {row.monthName}
+                  </span>
+                </div>
               </button>
             );
           })}
