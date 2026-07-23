@@ -51,11 +51,11 @@ export function renderFruitDetails(item) {
 // Compact labels for the print-friendly packing list (the icon already
 // conveys which fruit it is, so the text can be very short).
 const FRUIT_TAGS = {
-  pressec_groc:     "PG",
-  pressec_vermell:  "PV",
-  pressec_barrejat: "PB",
-  albercoc:         "Alb",
-  cirera:           "Cir",
+  pressec_groc:     "Groc",
+  pressec_vermell:  "Vermell",
+  pressec_barrejat: "Barrejat",
+  albercoc:         "Albercoc",
+  cirera:           "Cirera",
   melo:             "Meló",
   sindria:          "Síndria",
 };
