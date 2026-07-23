@@ -20,7 +20,7 @@ function initFormFromItem(item) {
     const qty = item.qty ?? 1;
     const wholeQty = Math.floor(qty);
     const hasHalf = qty % 1 !== 0;
-    return { size: item.size ?? 15, qty: wholeQty, halfBox: hasHalf };
+    return { size: item.size ?? null, qty: wholeQty, halfBox: hasHalf };
   }
   if (["albercoc", "cirera"].includes(item.fruit)) return { weight: item.weight ?? 1, qty: item.qty ?? 1 };
   return { qty: item.qty ?? 1, weight: item.weight ?? "" };
@@ -40,6 +40,7 @@ export default function FruitSelectorModal({ open, onClose, onAdd, editItem = nu
     isEditing ? (FRUIT_TYPES.find(f => f.key === editItem.fruit) || null) : null
   );
   const [form, setForm] = useState(() => initFormFromItem(editItem));
+  const [sizeError, setSizeError] = useState("");
 
   if (!open) return null;
 
@@ -47,12 +48,14 @@ export default function FruitSelectorModal({ open, onClose, onAdd, editItem = nu
     setStep("grid");
     setSelection(null);
     setForm({});
+    setSizeError("");
   };
 
   const handleFruitClick = (f) => {
     setSelection(f);
+    setSizeError("");
     if (f.group === "pressec") {
-      setForm({ size: 15, qty: 1, halfBox: false });
+      setForm({ size: null, qty: 1, halfBox: false });
     } else if (["albercoc", "cirera"].includes(f.key)) {
       setForm({ weight: 1, qty: 1 });
     } else {
@@ -73,6 +76,16 @@ export default function FruitSelectorModal({ open, onClose, onAdd, editItem = nu
 
   const handleSave = () => {
     if (!selection) return;
+
+    if (selection.group === "pressec") {
+      const sizeValue = Number(form.size);
+      if (!Number.isFinite(sizeValue) || sizeValue <= 0) {
+        setSizeError("Tria un calibre abans d'afegir");
+        return;
+      }
+      setSizeError("");
+    }
+
     let item;
     if (selection.group === "pressec") {
       const baseQty = Number(form.qty);
@@ -145,7 +158,10 @@ export default function FruitSelectorModal({ open, onClose, onAdd, editItem = nu
                       <button
                         key={s}
                         type="button"
-                        onClick={() => setForm(prev => ({ ...prev, size: s }))}
+                        onClick={() => {
+                          setForm(prev => ({ ...prev, size: s }));
+                          setSizeError("");
+                        }}
                         className="rounded-xl border py-2.5 text-sm font-semibold transition-all"
                         style={form.size === s
                           ? { backgroundColor: "#F59E0B", borderColor: "#F59E0B", color: "#1C1917" }
@@ -155,6 +171,9 @@ export default function FruitSelectorModal({ open, onClose, onAdd, editItem = nu
                         {s}
                       </button>
                     ))}
+                  </div>
+                  <div className="mt-2 text-center text-xs text-amber-400">
+                    {sizeError || (form.size ? "" : "Tria un calibre per continuar")}
                   </div>
                 </div>
                 <div>
@@ -254,7 +273,8 @@ export default function FruitSelectorModal({ open, onClose, onAdd, editItem = nu
               <button
                 type="button"
                 onClick={handleSave}
-                className="flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold text-stone-900 transition-all"
+                disabled={selection?.group === "pressec" && (!form.size || Number.isNaN(Number(form.size)))}
+                className="flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold text-stone-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ backgroundColor: "#F59E0B" }}
               >
                 {isEditing ? "Actualitzar" : "Afegir"}
