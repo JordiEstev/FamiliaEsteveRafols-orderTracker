@@ -109,6 +109,15 @@ function OrderListPage() {
   const [filterDate, setFilterDate] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem("olist_filters") || "{}").filterDate ?? today; } catch { return today; }
   });
+  const [dateFilterMode, setDateFilterMode] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem("olist_filters") || "{}").dateFilterMode ?? "single"; } catch { return "single"; }
+  });
+  const [dateRangeStart, setDateRangeStart] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem("olist_filters") || "{}").dateRangeStart ?? ""; } catch { return ""; }
+  });
+  const [dateRangeEnd, setDateRangeEnd] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem("olist_filters") || "{}").dateRangeEnd ?? ""; } catch { return ""; }
+  });
   const [filterPlace, setFilterPlace] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem("olist_filters") || "{}").filterPlace ?? "Tots els llocs"; } catch { return "Tots els llocs"; }
   });
@@ -148,7 +157,7 @@ function OrderListPage() {
   useEffect(() => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (filterDate) params.set("date", filterDate);
+    if (dateFilterMode === "single" && filterDate) params.set("date", filterDate);
     if (filterPlace !== "Tots els llocs") params.set("place", filterPlace);
     fetch(`${import.meta.env.VITE_API_URL}/orders?${params}`)
       .then(res => { if (!res.ok) throw new Error(`Server returned ${res.status}`); return res.json(); })
@@ -189,8 +198,8 @@ function OrderListPage() {
   }, []);
 
   useEffect(() => {
-    sessionStorage.setItem("olist_filters", JSON.stringify({ search, filterDate, filterPlace, sortNewestFirst }));
-  }, [search, filterDate, filterPlace, sortNewestFirst]);
+    sessionStorage.setItem("olist_filters", JSON.stringify({ search, filterDate, filterPlace, sortNewestFirst, dateFilterMode, dateRangeStart, dateRangeEnd }));
+  }, [search, filterDate, filterPlace, sortNewestFirst, dateFilterMode, dateRangeStart, dateRangeEnd]);
 
   // Reset place when date changes if no longer available
   useEffect(() => {
@@ -355,7 +364,20 @@ function OrderListPage() {
   const filteredOrders = orders
     .filter(order => {
       const matchesName  = order.customer.toLowerCase().includes(search.toLowerCase());
-      const matchesDate  = filterDate === "" || order.date === filterDate;
+      let matchesDate = true;
+      if (dateFilterMode === "single") {
+        matchesDate = filterDate === "" || order.date === filterDate;
+      } else if (dateFilterMode === "range") {
+        const start = dateRangeStart || null;
+        const end = dateRangeEnd || null;
+        if (start && end) {
+          matchesDate = order.date >= start && order.date <= end;
+        } else if (start) {
+          matchesDate = order.date >= start;
+        } else if (end) {
+          matchesDate = order.date <= end;
+        }
+      }
       const matchesPlace = filterPlace === "Tots els llocs" || order.place === filterPlace;
       return matchesName && matchesDate && matchesPlace;
     })
@@ -627,30 +649,74 @@ function OrderListPage() {
 
             {/* Date picker */}
             <div className="flex items-center gap-1.5">
+              {dateFilterMode === "single" ? (
+                <>
+                  <button
+                    onClick={() => setFilterDate(prev => addDays(prev || today, -1))}
+                    className="p-2.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 shadow-sm text-stone-600 leading-none text-lg font-medium transition-colors flex-shrink-0">
+                    &lsaquo;
+                  </button>
+                  <div className="flex-1 relative">
+                    <button
+                      onClick={() => document.getElementById("date-picker").showPicker?.()}
+                      className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-xl shadow-sm text-sm font-semibold text-stone-700 text-center hover:bg-stone-50 transition-colors">
+                      {filterDate ? getDateLabel(filterDate) : "Totes les dates"}
+                    </button>
+                    <input
+                      id="date-picker"
+                      type="date"
+                      value={filterDate}
+                      onChange={e => setFilterDate(e.target.value)}
+                      className="absolute opacity-0 pointer-events-none"
+                      style={{ top: 0, left: 0, width: "1px", height: "1px" }}
+                    />
+                  </div>
+                  <button
+                    onClick={() => setFilterDate(prev => addDays(prev || today, 1))}
+                    className="p-2.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 shadow-sm text-stone-600 leading-none text-lg font-medium transition-colors flex-shrink-0">
+                    &rsaquo;
+                  </button>
+                </>
+              ) : (
+                <div className="flex-1 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-stone-500">Des de</label>
+                    <input
+                      type="date"
+                      value={dateRangeStart}
+                      onChange={e => setDateRangeStart(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-stone-200 rounded-xl bg-white text-sm text-stone-700"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-stone-500">Fins a</label>
+                    <input
+                      type="date"
+                      value={dateRangeEnd}
+                      onChange={e => setDateRangeEnd(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-stone-200 rounded-xl bg-white text-sm text-stone-700"
+                    />
+                  </div>
+                </div>
+              )}
               <button
-                onClick={() => setFilterDate(prev => addDays(prev || today, -1))}
-                className="p-2.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 shadow-sm text-stone-600 leading-none text-lg font-medium transition-colors flex-shrink-0">
-                &lsaquo;
-              </button>
-              <div className="flex-1 relative">
-                <button
-                  onClick={() => document.getElementById("date-picker").showPicker?.()}
-                  className="w-full px-4 py-2.5 bg-white border border-stone-200 rounded-xl shadow-sm text-sm font-semibold text-stone-700 text-center hover:bg-stone-50 transition-colors">
-                  {filterDate ? getDateLabel(filterDate) : "Totes les dates"}
-                </button>
-                <input
-                  id="date-picker"
-                  type="date"
-                  value={filterDate}
-                  onChange={e => setFilterDate(e.target.value)}
-                  className="absolute opacity-0 pointer-events-none"
-                  style={{ top: 0, left: 0, width: "1px", height: "1px" }}
-                />
-              </div>
-              <button
-                onClick={() => setFilterDate(prev => addDays(prev || today, 1))}
-                className="p-2.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 shadow-sm text-stone-600 leading-none text-lg font-medium transition-colors flex-shrink-0">
-                &rsaquo;
+                onClick={() => {
+                  if (dateFilterMode === "all") {
+                    setDateFilterMode("single");
+                    setFilterDate(today);
+                  } else if (dateFilterMode === "single") {
+                    setDateFilterMode("range");
+                  } else {
+                    setDateFilterMode("all");
+                    setFilterDate("");
+                    setDateRangeStart("");
+                    setDateRangeEnd("");
+                  }
+                }}
+                className="px-3 py-2.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 shadow-sm text-sm font-semibold text-stone-700 transition-colors flex-shrink-0"
+                title={dateFilterMode === "all" ? "Mostrar totes les dates" : dateFilterMode === "range" ? "Filtrar per rang de dates" : "Filtrar per un dia"}
+              >
+                {dateFilterMode === "all" ? "Totes" : dateFilterMode === "range" ? "Rang" : "Dia"}
               </button>
             </div>
 
@@ -823,6 +889,11 @@ function OrderListPage() {
                         </div>
                       ))}
                     </div>
+                    {order.notes?.trim() && (
+                      <div className="mt-2 text-xs text-stone-600 italic border-t border-stone-100 pt-2">
+                        {order.notes.trim()}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
